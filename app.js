@@ -40,7 +40,7 @@ document.body.dataset.theme=localStorage.getItem('boltz-theme')||'day';
 $('clubrail').innerHTML=clubs.map(c=>'<a aria-label="'+c+' FC squad" href="#clubs/'+c+'">'+crest(c)+'</a>').join('');
 installCrestLoop();
 addEventListener('hashchange',()=>{closeSeasons();archiveTab='Overview';if(location.hash==='#matches'){matchSet='upcoming';team='';status=''}if(location.hash.startsWith('#clubs/'))year='s26';draw();if(page==='home' && returningToShowcase){returningToShowcase=false;document.querySelector('.clubStage').focus({preventScroll:true});document.querySelector('#showcase').scrollIntoView()}else window.scrollTo(0,0)});
-Promise.all([fetch('/boltz-league-match-centre/assets/records.json').then(r=>r.json()),fetch('/boltz-league-match-centre/assets/season-content.json').then(r=>r.json())]).then(([records,seed])=>{data=records;seasonDefaults=seed;applyLeague(seed);}).catch(()=>{$('app').textContent='League records could not load. Refresh to try again.'});
+Promise.all([fetch('/boltz-league-match-centre/assets/records.json').then(r=>r.json()),fetch('/boltz-league-match-centre/assets/season-content.json').then(r=>r.json())]).then(([records,seed])=>{data=records;seasonDefaults=seed;applyLeague(seed);syncLeague();setInterval(syncLeague,12000);document.addEventListener("visibilitychange",syncLeague);}).catch(()=>{$('app').textContent='League records could not load. Refresh to try again.'});
 function renderNavigation(){
   const links=Object.entries(pages).filter(([id])=>id!=='archive');
   $('nav').innerHTML=links.map(([id,name])=>{

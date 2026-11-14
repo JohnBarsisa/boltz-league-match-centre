@@ -5,10 +5,23 @@ function applyLeague(s){
   return {...m,home_score:scores[0],away_score:scores[1]};
  });renderSlide();draw();
 }
-async function syncLeague(){
- if(pendingLeague||document.hidden)return;pendingLeague=true;
- try{const r=await fetch('/api/league',{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(d.revision!==leagueRevision){applyLeague(d.state);leagueRevision=d.revision}}
- catch{/* Retain the last loaded programme while disconnected. */}finally{pendingLeague=false}
+async function syncLeague() {
+ if (pendingLeague || document.hidden) return;
+ pendingLeague = true;
+ try {
+  const response = await fetch('https://boltz-league-matchday.jpiyady.chatgpt.site/api/league', {cache:'no-store', credentials:'omit'});
+  if (!response.ok) return;
+  const {revision,state} = await response.json();
+  if (revision === leagueRevision) return;
+  const clubs = Object.fromEntries(Object.entries(seasonDefaults.clubs).map(([name,club]) =>
+   [name, {...club, players:state.clubs[name].players}]));
+  applyLeague({...seasonDefaults, clubs, matches:state.matches});
+  leagueRevision = revision;
+ } catch {
+  // The bundled programme stays available if the live feed is offline.
+ } finally {
+  pendingLeague = false;
+ }
 }
 function publishedLeaders(metric){
  const players=new Map();

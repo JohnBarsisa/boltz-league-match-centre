@@ -5,7 +5,7 @@ function streamFor(match){
   try{const url=new URL(match.stream);return url.protocol==='https:'?url.href:''}catch{return ''}
 }
 function currentTable(){
-  const byClub=new Map(currentClubNames().map(c=>[c+' FC',{team:c+' FC',played:0,won:0,drawn:0,lost:0,gf:0,ga:0,gd:0,points:0}]));
+  const byClub=new Map((leagueState?.tournament?[...new Set([...leagueState.tournament.clubs,...data.upcoming.flatMap(m=>[clean(m.home),clean(m.away)])])]:currentClubNames()).map(c=>[c+' FC',{team:c+' FC',played:0,won:0,drawn:0,lost:0,gf:0,ga:0,gd:0,points:0}]));
   for(const m of data.upcoming.filter(m=>m.status==='completed')){
     for(const [name,forGoals,against] of [[m.home,+m.home_score,+m.away_score],[m.away,+m.away_score,+m.home_score]]){
       const t=byClub.get(name);
@@ -23,8 +23,8 @@ function currentClubs(){
 }
 function seasonHub(inside){
   const live=data.upcoming.map((m,i)=>[m,i]).filter(([m])=>m.status==='live');
-  const sections=[['matches','Matches',data.upcoming.length+' fixtures · '+new Set(data.upcoming.map(m=>m.round)).size+' rounds'],['table','League table',currentClubNames().length+' clubs'],['stats','Player stats','Goals and assists'],['clubs','The contenders','Clubs and their fixtures']];
-  return '<section class="section">'+(inside?'<p class="desc">Saturday 21 November 2026 · First kick-off 13:00</p>':section('BOLTZ LEAGUE','SEASON 26'))+'<div class="hubgrid">'+sections.map(([id,title,sub])=>'<a class="hubitem" href="#'+id+'"><h3>'+title+' ↗</h3><small>'+sub+'</small></a>').join('')+'</div></section>'+(inside?liveBroadcast():'');
+  const sections=[['matches','Matches',data.upcoming.length+' fixtures · '+new Set(data.upcoming.map(m=>m.round)).size+' rounds'],['table','League table',(leagueState?.tournament?.clubs.length||currentClubNames().length)+' clubs'],['stats','Player stats','Goals and assists'],['clubs','The contenders','Clubs and their fixtures']];
+  return '<section class="section">'+(inside?'<p class="desc">'+esc(leagueState?.tournament?.date||'Saturday 21 November 2026 · First kick-off 13:00')+'</p>':section('BOLTZ LEAGUE',esc(leagueState?.tournament?.name||'SEASON 6')))+'<div class="hubgrid">'+sections.map(([id,title,sub])=>'<a class="hubitem" href="#'+id+'"><h3>'+title+' ↗</h3><small>'+sub+'</small></a>').join('')+'</div></section>'+(inside?liveBroadcast():'');
 }
 const slides=[
   {label:'SATURDAY 21 NOVEMBER 2026',title:'SEASON <em>26.</em>',description:'Seven clubs. One champion.',action:'Experience Season 26',route:'season'},
@@ -41,7 +41,7 @@ function renderSlide(){
  const reveal=()=>{if(next!==wrap.lastElementChild)return;requestAnimationFrame(()=>next.classList.add('shown'));setTimeout(()=>{if(next===wrap.lastElementChild){while(wrap.firstElementChild!==next)wrap.firstElementChild.remove();next.className=''}},650)};
  next.decode().then(reveal).catch(reveal)}
  art.alt=feature===0?'Illustrated Season 26 players in the seven participating clubs’ colours':'Footballers under floodlights from the Season 25 champions campaign';
- document.getElementById('slideLabel').innerHTML='<span class="line"></span>'+s.label;
+ document.getElementById('slideLabel').innerHTML='<span class="line"></span>'+(feature===0&&leagueState?.tournament?esc(leagueState.tournament.date):s.label);
  const campaign=leagueState?.features[feature];
  const heading=document.getElementById('slideTitle');if(feature===0 && (!campaign || /^season (26|6)\.?$/i.test(campaign.title))){heading.innerHTML='<span>BOLTZ LEAGUE</span><em>SEASON 6</em>'}else if(campaign){const words=campaign.title.toUpperCase().split(' '),em=document.createElement('em');em.textContent=words.pop();heading.replaceChildren(words.join(' ')+' ',em)}else heading.innerHTML=s.title;
  document.querySelector('#slideDesc p').textContent=campaign?.description||s.description;
@@ -81,3 +81,4 @@ function liveBroadcast() {
  return matchPoster(m,'upcoming')+(recent.length?'<ul class="broadcastEvents">'+recent.map(e=>'<li>'+esc([e.minute!==''?e.minute+'′':'',e.team,e.type,e.player].filter(Boolean).join(' · '))+'</li>').join('')+'</ul>':'');
  }).join('')+'</section>';
 }
+

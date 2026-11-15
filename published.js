@@ -3,7 +3,12 @@ function applyLeague(s){
  leagueState=s;data.upcoming=s.matches.map(m=>{
   const scores=[m.home,m.away].map(n=>m.events.filter(e=>(e.type==='goal'&&e.team===n)||(e.type==='own goal'&&e.team!==n)).length);
   return {...m,home_score:scores[0],away_score:scores[1]};
- });renderSlide();draw();
+ });
+ const layout=s.presentation;
+ for(const el of document.querySelectorAll('.brand span'))el.textContent=layout?.brand||'BOLTZ LEAGUE';
+ document.querySelector('#showTitle').textContent=layout?.clubHeading||'THE CONTENDERS';
+ const footer=document.querySelector('footer .foot > span');if(footer)footer.textContent=layout?.footer||'SOFTTED Football';
+ renderSlide();draw();
 }
 async function syncLeague() {
  if (pendingLeague || document.hidden) return;
@@ -13,12 +18,9 @@ async function syncLeague() {
   if (!response.ok) return;
   const {revision,state} = await response.json();
   if (revision === leagueRevision) return;
-  const clubs = Object.fromEntries(Object.entries(state.clubs).map(([name,club]) => {
-   const packaged=seasonDefaults.clubs[name];
-   return [name,packaged ? {...packaged,players:club.players,squadName:club.squadName} :
-    {...club,image:'/boltz-league-match-centre/assets/hero.webp'}];
-  }));
-  applyLeague({...seasonDefaults, clubs, matches:state.matches});
+  const media=p=>p?.startsWith('/media/')?'https://boltz-league-matchday.jpiyady.chatgpt.site'+p:p?.startsWith('/assets/')?'/boltz-league-match-centre'+p:p;
+  const clubs=Object.fromEntries(Object.entries(state.clubs).map(([name,c])=>[name,{...c,image:media(c.image),scene:c.scene&&{...c.scene,poster:media(c.scene.poster),clip:media(c.scene.clip)}}]));
+  applyLeague({...state,clubs,features:state.features.map(f=>({...f,image:media(f.image)}))});
   leagueRevision = revision;
  } catch {
   // The bundled programme stays available if the live feed is offline.
@@ -58,3 +60,4 @@ function lineupView(m,source){
  return '<div><h4>'+esc(side)+'</h4><small>'+esc(shape||(archived?'Archived club lineup':'Starting lineup'))+'</small>'+shirtPitch(side,points,esc)+'</div>';
  }).join('')+'</div>';
 }
+

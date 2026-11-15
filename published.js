@@ -13,8 +13,11 @@ async function syncLeague() {
   if (!response.ok) return;
   const {revision,state} = await response.json();
   if (revision === leagueRevision) return;
-  const clubs = Object.fromEntries(Object.entries(seasonDefaults.clubs).map(([name,club]) =>
-   [name, {...club, players:state.clubs[name].players, squadName:state.clubs[name].squadName}]));
+  const clubs = Object.fromEntries(Object.entries(state.clubs).map(([name,club]) => {
+   const packaged=seasonDefaults.clubs[name];
+   return [name,packaged ? {...packaged,players:club.players,squadName:club.squadName} :
+    {...club,image:'/boltz-league-match-centre/assets/hero.webp'}];
+  }));
   applyLeague({...seasonDefaults, clubs, matches:state.matches});
   leagueRevision = revision;
  } catch {
@@ -34,13 +37,14 @@ function publishedLeaders(metric){
 function clubProfile(name){
  const c=leagueState?.clubs[name];if(!c)return '';
  const defaults=seasonDefaults.clubs[name], prior=priorClubCopy[name];
- const title=c.title===prior[0]?defaults.title:c.title,bio=c.bio===prior[1]?defaults.bio:c.bio;
+ const title=defaults && prior && c.title===prior[0]?defaults.title:c.title;
+ const bio=defaults && prior && c.bio===prior[1]?defaults.bio:c.bio;
  const scene=c.scene||{};
  const selected=Boolean(scene.player && scene.poster);
  const poster=selected?scene.poster:'/boltz-league-match-centre/storyboard/'+name+'.webp';
  const clip=selected?scene.clip:null;
  const label=selected?scene.player+' · '+name+' FC':'Season 6 campaign artwork';
- const frame='<figure class="profileFilm"><div class="filmFrame"><img class="filmStill" src="'+esc(poster)+'" alt="'+esc(selected?scene.player+' in the '+name+' FC kit':name+' FC scene preview')+'">'+
+ const frame=!selected&&!defaults?'':'<figure class="profileFilm"><div class="filmFrame"><img class="filmStill" src="'+esc(poster)+'" alt="'+esc(selected?scene.player+' in the '+name+' FC kit':name+' FC scene preview')+'">'+
  (clip?'<video hidden muted playsinline loop preload="none" poster="'+esc(poster)+'" data-src="'+esc(clip)+'" aria-label="'+esc(label)+'"></video>':'')+'</div><figcaption>'+esc(label)+'</figcaption></figure>';
  return '<article class="clubprofile"><header class="profileHeading"><div class="kicker">SEASON 6 · CLUB PROFILE</div><h2>'+esc(name)+' FC</h2><h3 class="clubmotto">'+esc(title)+'</h3></header>'+frame+'<section class="profileStory"><p>'+esc(bio)+'</p><h3>'+esc(c.squadName || 'Squad')+'</h3>'+(c.players.length?'<ul class="roster">'+c.players.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>':'<p class="note">The club’s squad has yet to be announced.</p>')+'</section></article>';
 }

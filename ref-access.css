@@ -10,3 +10,12 @@
 #refLogin::backdrop{background:rgb(0 0 0 / .65)}
 #refLogin h2{margin:0 0 16px}#refLogin label{display:grid;gap:6px;font-weight:650}#refLogin input{font:inherit;padding:12px;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:6px;width:100%}
 #refLogin form>div{display:flex;gap:10px;align-items:center}#refLogin [data-cancel]{color:var(--ink);background:transparent;border:0;padding:10px;cursor:pointer}
+
+.refNav{display:none;border-bottom:1px solid var(--rule);background:var(--surface)}
+.ref-active .refNav{display:block}
+.refNav nav{display:flex;align-items:center;gap:.25rem;overflow-x:auto}
+.refNav a,.fixtureEdit{font:inherit;font-weight:700;font-size:.85rem;text-decoration:none;white-space:nowrap;color:var(--brand)}
+.refNav a{display:inline-flex;padding:.65rem .75rem;min-height:44px;align-items:center}
+.refNav a:hover,.refNav a:focus-visible{text-decoration:underline}
+.ref-active .fixtureEdit{padding:.5rem .8rem;border:1px solid var(--rule);border-radius:.4rem;margin:.55rem 0 0;align-items:center;min-height:42px}
+.fixtureEdit:is(:hover,:focus-visible){background:var(--accent-fill);color:var(--accent-ink)}

@@ -18,8 +18,9 @@ const collator = new Intl.Collator('en', {sensitivity:'base', numeric:true});
 const eventIcons={'goal':'⚽','own goal':'↩','clean sheet':'🛡','yellow card':'🟨','red card':'🟥'};
 let editingPlayer=null;
 let role='guest';
-const tabs=['Match control','Clubs & squads','Database control','Homepage','Navigation'];
-let state,revision,dirty=false,busy=false,tab=tabs[0],club='Foxes',matchId,feature=0,eventSide,editEvent;
+const sectionTabs={teams:'Teams & squads',fixtures:'Fixtures',live:'Live matches',database:'Database control'};
+const tabs=[...Object.values(sectionTabs),'Homepage','Navigation'];
+let state,revision,dirty=false,busy=false,tab=sectionTabs[query.get('section')] || (query.has('match')?'Live matches':tabs[0]),club='Foxes',matchId,feature=0,eventSide,editEvent;
 window.boltzRefDirty=()=>dirty;
 const say=v=>$('feedback').textContent=v;
 const match=()=>state.matches.find(m=>m.id===matchId);
@@ -31,15 +32,14 @@ const select=(label,id,items,value)=>'<label>'+label+'<select id="'+id+'">'+opts
 const chooseClub=n=>n.replace(/ FC$/,'');
 function changed(){dirty=true;notifyParent({type:'boltz-ref-dirty',dirty:true});$('revision').textContent='Unpublished changes';$('publish').disabled=busy}
 function render(){
- $('tabs').innerHTML=(role==='owner'?tabs:tabs.slice(0,3)).map(t=>'<button data-tab="'+t+'" class="'+(tab===t?'on':'')+'">'+t+'</button>').join('');
- $('workspace').innerHTML='<h2>'+tab+'</h2>'+({'Match control':matchView,'Clubs & squads':clubView,'Database control':databaseView,Homepage:featureView,Navigation:menuView}[tab]());
+ $('tabs').innerHTML=(role==='owner'?tabs:Object.values(sectionTabs)).map(t=>'<button data-tab="'+t+'" class="'+(tab===t?'on':'')+'">'+t+'</button>').join('');
+ $('workspace').innerHTML='<h2>'+tab+'</h2>'+({'Live matches':matchView,Fixtures:fixtureView,'Teams & squads':clubView,'Database control':databaseView,Homepage:featureView,Navigation:menuView}[tab]());
  if($('assist')) $('assist').closest('label').hidden=$('type').value!=='goal';
- if(role==='referee' && $('stream')) $('stream').closest('label').hidden=true;
 }
 function uploadControl(path){return '<img class="art" src="'+escape(path.startsWith('/media/')?path:base+path)+'" alt="Current artwork"><label>Replace artwork<input id="upload" type="file" accept="image/jpeg,image/png,image/webp"></label><p class="hint">JPEG, PNG or WebP, up to 3 MB. Publish to display it in the match centre.</p>'}
 function sceneEditor(c){
  const media=c.scene||{};
- return '<section class="card"><h3>Season 6 player film</h3><p>'+escape(sceneBriefs[club])+'</p><p>Frame one selected club player in their own kit, with boots and one football visible. Upload a short muted MP4 and a still of the same player.</p>'+
+ return '<section class="card"><h3>Season 6 player film</h3><p>'+escape(sceneBriefs[club]||'Upload a selected player in the team kit.')+'</p><p>Frame one selected club player in their own kit, with boots and one football visible. Upload a short muted MP4 and a still of the same player.</p>'+
  field('Selected player','scenePlayer',media.player||'')+
  '<label>Player still<input type="file" data-scene="poster" accept="image/jpeg,image/png,image/webp"></label>'+
  '<label>Player clip<input type="file" data-scene="clip" accept="video/mp4"></label>'+
@@ -61,7 +61,9 @@ function rosterEditor(c) {
    '</section>';
 }
 function clubView() {
- const c=state.clubs[club], picker=select('Club','club',Object.keys(state.clubs).sort(collator.compare),club);
+ const c=state.clubs[club];
+ const add='<form id="addTeamForm" class="rosterForm"><label>Team name<input id="newTeamName" autocomplete="off" maxlength="53" required></label><button type="submit">Add team</button></form>';
+ const picker=add+select('Team roster','club',Object.keys(state.clubs).sort(collator.compare),club);
  if(role==='referee') return picker+rosterEditor(c);
  return picker+rosterEditor(c)+'<div class="card">'+field('Club headline','title',c.title)+field('Kit colours','kit',c.kit)+area('Club bio','bio',c.bio)+uploadControl(c.image)+'</div>'+sceneEditor(c);
 }
@@ -95,6 +97,19 @@ function editRoster(oldName,newName) {
  editingPlayer=null;changed();render();return true;
 }
 document.addEventListener('submit', async e=>{
+ if(e.target.id==='addTeamForm'){
+  e.preventDefault();
+  if(busy)return;
+  const name=$('newTeamName').value.normalize('NFKC').trim().replace(/\s+/g,' ').replace(/ FC$/i,'');
+  if(!/^[\p{L}\p{N}][\p{L}\p{M}\p{N} .’'&-]{0,49}$/u.test(name)||Object.hasOwn(Object.prototype,name)){say('Enter a team name up to 50 characters.');return}
+  if(Object.keys(state.clubs).some(n=>collator.compare(n,name)===0)){say('That team is already registered.');return}
+  if(Object.keys(state.clubs).length>=64){say('The season has reached its team limit.');return}
+  const saveNow=!dirty;
+  state.clubs[name]={title:name+' FC',bio:'Season 6 squad.',kit:'Unconfirmed',image:'/assets/hero.webp',players:[]};
+  club=name;editingPlayer=null;changed();render();
+  if(saveNow)await publishDraft();else say('Team added to draft. Publish to share it.');
+  $('rosterInput')?.focus();return;
+ }
  if(e.target.id!=='rosterForm')return;
  e.preventDefault();
  const name=$('rosterInput').value.trim();
@@ -112,18 +127,26 @@ function score(m){return [m.home,m.away].map(n=>m.events.filter(e=>(e.type==='go
 function fixtureActions() {
  return '<div class="row fixtureActions"><button id="newMatch">Add fixture</button><button class="danger" id="deleteFixture">Delete selected fixture</button></div>';
 }
+function fixturePicker(m,label='Fixture'){
+ return '<label>'+label+'<select id="fixture">'+state.matches.map(x=>'<option value="'+escape(x.id)+'" '+(m===x?'selected':'')+'>'+escape(x.round+' · '+x.kickoff+' · '+x.home+' v '+x.away+' · '+x.status)+'</option>').join('')+'</select></label>';
+}
+function fixtureView(){
+ const m=match();if(!m)return '<button id="newMatch">Add fixture</button>';
+ const clubs=Object.keys(state.clubs).map(n=>n+' FC').sort(collator.compare);
+ return fixturePicker(m)+fixtureActions()+'<section class="card"><h3>Fixture details</h3>'+'<div class="grid">'+select('Home club','home',clubs,m.home)+select('Away club','away',clubs,m.away)+'<label>Round or stage<input id="round" list="roundNames" maxlength="50" value="'+escape(m.round)+'"></label><datalist id="roundNames">'+opts([...new Set([...state.matches.map(m=>m.round),...Array.from({length:12},(_,i)=>'Week '+(i+1)),'Semi-final','Final'])],m.round)+'</datalist>'+field('Kickoff','kickoff',m.kickoff,'time')+field('Pitch','venue',m.venue)+select('Status','status',['scheduled','live','completed'],m.status)+'</div>'+field('TV / stream URL','stream',m.stream||'','url')+'<button id="openMatch">Edit live match &amp; lineup</button></section>';
+}
 function matchView(){const m=match();if(!m)return '<button id="newMatch">Add fixture</button>';
- const sides=[m.home,m.away],clubs=Object.keys(state.clubs).map(n=>n+' FC');if(!sides.includes(eventSide))eventSide=m.home;
+ const sides=[m.home,m.away];if(!sides.includes(eventSide))eventSide=m.home;
  const e=m.events.find(x=>x.id===editEvent)||{team:eventSide,minute:'',player:'',assist:'',type:'goal'};
- return '<label>Fixture<select id="fixture">'+state.matches.map(x=>'<option value="'+escape(x.id)+'" '+(m===x?'selected':'')+'>'+escape(x.round+' · '+x.kickoff+' · '+x.home+' v '+x.away)+'</option>').join('')+'</select></label>'+fixtureActions()+'<div class="card"><div class="row"><h3>'+escape(m.home+' v '+m.away)+'</h3><span class="score">'+(m.status==='scheduled'?'—':score(m))+'</span></div>'+(m.status==='completed'?'':'<button id="matchClock">'+(m.status==='scheduled'?'Start match':'Finish match')+' &amp; publish</button>')+'<div class="grid">'+select('Home club','home',clubs,m.home)+select('Away club','away',clubs,m.away)+'<label>Round or stage<input id="round" list="roundNames" maxlength="50" value="'+escape(m.round)+'"></label><datalist id="roundNames">'+opts([...new Set([...state.matches.map(m=>m.round),...Array.from({length:12},(_,i)=>'Week '+(i+1)),'Semi-final','Final'])],m.round)+'</datalist>'+field('Kickoff','kickoff',m.kickoff,'time')+field('Pitch','venue',m.venue)+select('Status','status',['scheduled','live','completed'],m.status)+'</div>'+field('Stream URL','stream',m.stream||'','url')+'</div><div class="card"><h3>Match timeline</h3><ol class="events">'+m.events.map(x=>'<li>'+escape([x.minute===''?'':x.minute+'′',eventIcons[x.type]+' '+x.type,x.team,x.player,x.assist?'assist '+x.assist:''].filter(Boolean).join(' · '))+' <button data-edit="'+escape(x.id)+'">Edit</button><button data-remove="'+escape(x.id)+'">Remove</button></li>').join('')+'</ol><div class="grid">'+'<label>Event<select id="type">'+Object.entries(eventIcons).map(([value,icon])=>'<option value="'+value+'" '+(value===e.type?'selected':'')+'>'+icon+' '+value+'</option>').join('')+'</select></label>'+select('Club','eventSide',sides,eventSide)+field('Minute (optional)','minute',e.minute,'number')+'<label>Player<input maxlength="70" id="player" list="rosterNames" value="'+escape(e.player)+'"></label><label>Assist (optional)<input id="assist" list="rosterNames" value="'+escape(e.assist)+'"></label></div><datalist id="rosterNames">'+opts(players(eventSide),'')+'</datalist><button id="addEvent">'+(editEvent?'Update event':'Add event')+'</button></div><div class="card" id="startingLineups"><h3>Starting lineups</h3><div class="grid">'+sides.map((n,i)=>'<div><h4>'+escape(n)+'</h4>'+select('Formation','shape-'+i,['Unannounced','2-3-1','3-2-1','2-2-1','2-1-1','4-3-3','4-4-2','3-5-2','4-2-3-1'],m.formations?.[n]||'Unannounced')+'<p class="hint">Drag a jersey or focus it and use the arrow keys to position a player.</p>'+shirtPitch(n,pitchPoints(m.lineups[n]||[],m.formations?.[n],m.positions?.[n]),escape,i)+'<label>Starter name<input id="starter-'+i+'" maxlength="70"></label><button type="button" data-starter="'+i+'">Add starter</button>'+[...new Set([...players(n),...(m.lineups[n]||[])])].map(v=>'<label class="check"><input type="checkbox" data-line="'+i+'" value="'+escape(v)+'" '+((m.lineups[n]||[]).includes(v)?'checked':'')+'>'+escape(v)+'</label>').join('')+(!players(n).length?'':'')+'</div>').join('')+'</div></div>'}
+ return fixturePicker(m,'Match to edit')+'<section class="card"><div class="row"><h3>'+escape(m.home+' v '+m.away)+'</h3><span class="score">'+(m.status==='scheduled'?'—':score(m))+'</span></div><p>'+escape(m.round+' · '+m.kickoff+' · '+m.venue+' · '+m.status)+'</p>'+(m.status==='completed'?'':'<button id="matchClock">'+(m.status==='scheduled'?'Start match':'Finish match')+' &amp; publish</button>')+'</section><div class="card"><h3>Match timeline</h3><ol class="events">'+m.events.map(x=>'<li>'+escape([x.minute===''?'':x.minute+'′',eventIcons[x.type]+' '+x.type,x.team,x.player,x.assist?'assist '+x.assist:''].filter(Boolean).join(' · '))+' <button data-edit="'+escape(x.id)+'">Edit</button><button data-remove="'+escape(x.id)+'">Remove</button></li>').join('')+'</ol><div class="grid">'+'<label>Event<select id="type">'+Object.entries(eventIcons).map(([value,icon])=>'<option value="'+value+'" '+(value===e.type?'selected':'')+'>'+icon+' '+value+'</option>').join('')+'</select></label>'+select('Club','eventSide',sides,eventSide)+field('Minute (optional)','minute',e.minute,'number')+'<label>Player<input maxlength="70" id="player" list="rosterNames" value="'+escape(e.player)+'"></label><label>Assist (optional)<input id="assist" list="rosterNames" value="'+escape(e.assist)+'"></label></div><datalist id="rosterNames">'+opts(players(eventSide),'')+'</datalist><button id="addEvent">'+(editEvent?'Update event':'Add event')+'</button></div><div class="card" id="startingLineups"><h3>Starting lineups</h3><div class="grid">'+sides.map((n,i)=>'<div><h4>'+escape(n)+'</h4>'+select('Formation','shape-'+i,['Unannounced','2-3-1','3-2-1','2-2-1','2-1-1','4-3-3','4-4-2','3-5-2','4-2-3-1'],m.formations?.[n]||'Unannounced')+'<p class="hint">Drag a jersey or focus it and use the arrow keys to position a player.</p>'+shirtPitch(n,pitchPoints(m.lineups[n]||[],m.formations?.[n],m.positions?.[n]),escape,i)+'<label>Starter name<input id="starter-'+i+'" maxlength="70"></label><button type="button" data-starter="'+i+'">Add starter</button>'+[...new Set([...players(n),...(m.lineups[n]||[])])].map(v=>'<label class="check"><input type="checkbox" data-line="'+i+'" value="'+escape(v)+'" '+((m.lineups[n]||[]).includes(v)?'checked':'')+'>'+escape(v)+'</label>').join('')+(!players(n).length?'':'')+'</div>').join('')+'</div></div>'}
 function capture(el){
  const k=el.id,v=el.value;
- if(tab==='Clubs & squads'&&k==='squadName'){state.clubs[club].squadName=v.trim()||club+' FC'}
- else if(tab==='Clubs & squads'&&k==='scenePlayer'){(state.clubs[club].scene??={}).player=v.trim()}
+ if(tab==='Teams & squads'&&k==='squadName'){state.clubs[club].squadName=v.trim()||club+' FC'}
+ else if(tab==='Teams & squads'&&k==='scenePlayer'){(state.clubs[club].scene??={}).player=v.trim()}
  else if(tab==='Navigation'&&k.startsWith('menu-'))state.menu[k.slice(5)]=v;
  else if(tab==='Homepage'&&['title','description'].includes(k))state.features[feature][k]=v;
- else if(tab==='Clubs & squads'&&['title','kit','bio','players'].includes(k))state.clubs[club][k]=k==='players'?v.split('\n').map(n=>n.trim()).filter(Boolean):v;
- else if(tab==='Match control'&&['home','away','round','kickoff','venue','status','stream'].includes(k)){
+ else if(tab==='Teams & squads'&&['title','kit','bio','players'].includes(k))state.clubs[club][k]=k==='players'?v.split('\n').map(n=>n.trim()).filter(Boolean):v;
+ else if(['Fixtures','Live matches'].includes(tab)&&['home','away','round','kickoff','venue','status','stream'].includes(k)){
   const m=match();if(['home','away'].includes(k)&&v!==m[k]){if(m.status!=='scheduled'||m.events.length||Object.values(m.lineups).some(a=>a.length)||Object.keys(m.formations||{}).length||Object.keys(m.positions||{}).length){say('Clubs can change only on a scheduled fixture with no events or lineup setup.');el.value=m[k];return}if(v===m[k==='home'?'away':'home']){say('Choose two different clubs.');el.value=m[k];return}}
   if(k==='status'&&v==='scheduled'&&m.events.length){say('A match with events must be live or completed.');el.value=m.status;return}m[k]=v;
  }else return;
@@ -152,8 +175,9 @@ document.addEventListener('change',async e=>{const el=e.target,v=el.value;
  render();
 });
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||busy)return;
+ if(b.id==='openMatch'){tab='Live matches';editEvent=null;render();return}
  if(b.id==='openSquadLineup'){
-  matchId=$('squadFixture').value;eventSide=club+' FC';editEvent=null;tab='Match control';render();
+  matchId=$('squadFixture').value;eventSide=club+' FC';editEvent=null;tab='Live matches';render();
   $('startingLineups')?.scrollIntoView({block:'start'});return;
  }
  if(b.id==='matchClock'){
@@ -186,7 +210,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button');i
  }
  if(b.id==='clearScene'){delete state.clubs[club].scene;changed();render();return}
  if(b.dataset.tab){tab=b.dataset.tab;editingPlayer=null;editEvent=null;say('');render();return}
- if(b.id==='newMatch'){if(state.matches.length>=150){say('Season fixture limit reached.');return}const m={id:crypto.randomUUID(),round:'Round 1',kickoff:'13:00',venue:'Pitch 1',home:'Stacey FC',away:'Foxes FC',status:'scheduled',events:[],lineups:{},stream:''};state.matches.push(m);matchId=m.id;changed();render();return}
+ if(b.id==='newMatch'){if(state.matches.length>=150){say('Season fixture limit reached.');return}const m={id:crypto.randomUUID(),round:'Round 1',kickoff:'13:00',venue:'Pitch 1',home:'Stacey FC',away:'Foxes FC',status:'scheduled',events:[],lineups:{},stream:''};state.matches.push(m);matchId=m.id;tab='Fixtures';changed();render();return}
  if(b.dataset.remove){match().events=match().events.filter(x=>x.id!==b.dataset.remove);editEvent=null;changed();render();return}
  if(b.dataset.edit){editEvent=b.dataset.edit;eventSide=match().events.find(x=>x.id===editEvent).team;render();$('player').focus();return}
  if(b.id==='addEvent'){const m=match();if(m.status==='scheduled'){say('Set the fixture to live before logging an event.');return}
@@ -216,10 +240,23 @@ function lockDesk(){
 }
 async function start(){
  if(location.pathname.startsWith('/referee')){document.querySelector('header h1').textContent='Ref Area';document.title='Ref Area · Boltz League'}
- const access=await deskFetch('api/access').then(r=>r.json());role=access.role;
- if(role==='guest'){lockDesk();return}
- const r=await deskFetch('api/state');if(!r.ok)throw Error('Unable to load season.');const d=await r.json();state=d.state;revision=d.revision;dirty=false;notifyParent({type:'boltz-ref-dirty',dirty:false});$('publish').disabled=true;
- const requested=new URLSearchParams(location.search).get('match');matchId=state.matches.find(m=>m.id===requested)?.id||state.matches[0]?.id;
+ let publication;
+ if(embedded){
+   publication=await window.parent.boltzRefReady();
+   if(publication?.role!=='referee'||!publication.state)throw Error('Referee session unavailable. Open Ref Access to reconnect.');
+   role=publication.role;
+ }else{
+   const access=await deskFetch('api/access').then(r=>r.json());
+   role=access.role;
+   if(role==='guest'){lockDesk();return}
+   const response=await deskFetch('api/state');
+   if(!response.ok)throw Error('Unable to load the season.');
+   publication=await response.json();
+ }
+ state=publication.state;revision=publication.revision;dirty=false;
+ notifyParent({type:'boltz-ref-dirty',dirty:false});$('publish').disabled=true;
+ const requested=query.get('match') || matchId;
+ matchId=state.matches.find(m=>m.id===requested)?.id||state.matches.find(m=>m.status==='live')?.id||state.matches.find(m=>m.status==='scheduled')?.id||state.matches[0]?.id;
  $('publish').hidden=false;$('signout').hidden=embedded||role!=='referee';$('revision').textContent=(role==='owner'?'Owner':'Referee')+' · revision '+revision;say('');render();
 }
 $('signout').onclick=async()=>{if(dirty&&!confirm('Discard unpublished changes and lock?'))return;const r=await deskFetch('api/logout',{method:'POST'});if(r.ok){dirty=false;location.reload()}};

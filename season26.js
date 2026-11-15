@@ -5,7 +5,7 @@ function streamFor(match){
   try{const url=new URL(match.stream);return url.protocol==='https:'?url.href:''}catch{return ''}
 }
 function currentTable(){
-  const byClub=new Map(contenders.map(c=>[c+' FC',{team:c+' FC',played:0,won:0,drawn:0,lost:0,gf:0,ga:0,gd:0,points:0}]));
+  const byClub=new Map(currentClubNames().map(c=>[c+' FC',{team:c+' FC',played:0,won:0,drawn:0,lost:0,gf:0,ga:0,gd:0,points:0}]));
   for(const m of data.upcoming.filter(m=>m.status==='completed')){
     for(const [name,forGoals,against] of [[m.home,+m.home_score,+m.away_score],[m.away,+m.away_score,+m.home_score]]){
       const t=byClub.get(name);
@@ -17,12 +17,13 @@ function currentTable(){
 }
 function currentClubs(){
   const fixtures=data.upcoming.map((m,i)=>[m,i]).filter(([m])=>[clean(m.home),clean(m.away)].includes(selectedClub));
-  if(!location.hash.split('/')[1])return '';
-  return '<a href="#clubs" class="more">‹ All clubs</a>'+clubProfile(selectedClub)+'<div class="clubgrid">'+contenders.map(c=>'<a class="clubcard" href="#clubs/'+c+'">'+crest(c)+c+' FC</a>').join('')+'</div><h3 class="group">'+esc(selectedClub)+' FC · Season fixtures</h3><div class="cards">'+fixtures.map(([m,i])=>card(m,i,'upcoming')).join('')+'</div>';
+  const directory='<div class="clubgrid">'+currentClubNames().map(c=>'<a class="clubcard" href="#clubs/'+encodeURIComponent(c)+'">'+crest(c)+esc(c)+' FC</a>').join('')+'</div>';
+  if(!location.hash.split('/')[1] || !selectedClub)return directory;
+  return '<a href="#clubs" class="more">‹ All clubs</a>'+clubProfile(selectedClub)+directory+'<h3 class="group">'+esc(selectedClub)+' FC · Season fixtures</h3><div class="cards">'+fixtures.map(([m,i])=>card(m,i,'upcoming')).join('')+'</div>';
 }
 function seasonHub(inside){
   const live=data.upcoming.map((m,i)=>[m,i]).filter(([m])=>m.status==='live');
-  const sections=[['matches','Matches',data.upcoming.length+' fixtures · '+new Set(data.upcoming.map(m=>m.round)).size+' rounds'],['table','League table','Standings for all seven clubs'],['stats','Player stats','Goals and assists'],['clubs','The contenders','Clubs and their fixtures']];
+  const sections=[['matches','Matches',data.upcoming.length+' fixtures · '+new Set(data.upcoming.map(m=>m.round)).size+' rounds'],['table','League table',currentClubNames().length+' clubs'],['stats','Player stats','Goals and assists'],['clubs','The contenders','Clubs and their fixtures']];
   return '<section class="section">'+(inside?'<p class="desc">Saturday 21 November 2026 · First kick-off 13:00</p>':section('BOLTZ LEAGUE','SEASON 26'))+'<div class="hubgrid">'+sections.map(([id,title,sub])=>'<a class="hubitem" href="#'+id+'"><h3>'+title+' ↗</h3><small>'+sub+'</small></a>').join('')+'</div></section>'+(inside?liveBroadcast():'');
 }
 const slides=[

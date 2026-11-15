@@ -1,0 +1,66 @@
+/* Semantic colour pairs shared with the referee desk and gallery. */
+body[data-mode] {
+  --gold: var(--accent-fill);
+  --accent-ink: #111a20;
+  --rail-surface: color-mix(in srgb,var(--surface) 75%,var(--bg));
+  --hover-surface: color-mix(in srgb,var(--surface) 89%,var(--brand));
+}
+body[data-mode=light] {
+  color-scheme: light;
+  --bg:#f2f4f6; --surface:#fff; --ink:#18202a; --muted:#495769; --rule:#a5afba; --brand:#795000; --accent-fill:#ffca3a;
+}
+body[data-mode=dark] {
+  color-scheme: dark;
+  --bg:#101820; --surface:#1b2633; --ink:#f2f5f7; --muted:#bdcbd8; --rule:#64758a; --brand:#ffd56a; --accent-fill:#ffd05b;
+}
+body[data-palette=forest][data-mode=light] {
+  --bg:#edf3ee; --surface:#fcfffb; --ink:#162a20; --muted:#475e50; --rule:#92a699; --brand:#196143; --accent-fill:#81e8a9;
+}
+body[data-palette=forest][data-mode=dark] {
+  --bg:#101f18; --surface:#1c3026; --ink:#effaf3; --muted:#b5d3bf; --rule:#688577; --brand:#8cebb0; --accent-fill:#7ce7aa;
+}
+body[data-palette=midnight][data-mode=light] {
+  --bg:#edf2f9; --surface:#fbfdff; --ink:#172944; --muted:#475a76; --rule:#94a7be; --brand:#21569b; --accent-fill:#96cbff;
+}
+body[data-palette=midnight][data-mode=dark] {
+  --bg:#0b1326; --surface:#17263d; --ink:#eaf3ff; --muted:#b7cce4; --rule:#69839d; --brand:#94caff; --accent-fill:#8bc6ff;
+}
+body[data-palette=burgundy][data-mode=light] {
+  --bg:#f7eff1; --surface:#fffbfc; --ink:#3d1e2d; --muted:#70525e; --rule:#b89da9; --brand:#90324f; --accent-fill:#ffa5bd;
+}
+body[data-palette=burgundy][data-mode=dark] {
+  --bg:#21131a; --surface:#351e2a; --ink:#fff0f3; --muted:#e0bdc8; --rule:#9d7585; --brand:#ffaac1; --accent-fill:#ffa2b7;
+}
+body[data-palette=charcoal][data-mode=light] {
+  --bg:#f3f1ea; --surface:#fffcf4; --ink:#24231d; --muted:#605b49; --rule:#a79f88; --brand:#765400; --accent-fill:#f7cf70;
+}
+body[data-palette=charcoal][data-mode=dark] {
+  --bg:#141413; --surface:#262623; --ink:#faf6ed; --muted:#cdc5af; --rule:#8a806a; --brand:#ffce54; --accent-fill:#ffce54;
+}
+body[data-mode] :is(.rail,.contenderRail,footer) {background:var(--rail-surface);color:var(--ink);border-color:var(--rule)}
+body[data-mode] :is(.mast,.seasonMenu) {background:var(--surface);color:var(--ink);border-color:var(--rule)}
+.organiser,.brand img {isolation:isolate}
+body[data-mode] .organiser {background:#101823;border-radius:4px;padding-inline:4px}
+body[data-mode] :is(.adminLink,.mast nav a,#seasonToggle,.seasonMenu small) {color:var(--ink)}
+body[data-mode] :is(.adminLink,.theme) {border-color:var(--rule)}
+body[data-mode] .seasonMenu a:is(:focus-visible,:hover),
+body[data-mode] #nav :is(a,button):is(:hover,:focus-visible) {background:var(--hover-surface);color:var(--brand)}
+body[data-mode] .mast :is(nav a.active,#seasonToggle.active,#seasonToggle span),body[data-mode] .versus>b {color:var(--brand)}
+body[data-mode] .mast nav a.active:after {background:var(--brand)}
+body[data-mode] #seasonToggle.active {box-shadow:inset 0 -3px var(--brand)}
+body[data-mode] .effectModes [aria-pressed=true] {background:var(--accent-fill);color:var(--accent-ink)}
+body[data-mode] .primary {color:var(--accent-ink)}
+body[data-mode] .appearance-field {border:0;margin:0 0 1rem;padding:0}
+.appearance-field legend {font-weight:700;color:var(--muted);margin-bottom:.4rem}
+.appearance-field>div {display:flex;gap:.5rem;flex-wrap:wrap}
+.appearance-option {position:relative;cursor:pointer}
+.appearance-option input {position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.appearance-option span {display:flex;align-items:center;gap:.45rem;min-height:42px;padding:.4rem .75rem;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:6px}
+.appearance-option input:checked+span {font-weight:700;border-color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand);color:var(--brand)}
+.appearance-option input:focus-visible+span {outline:3px solid var(--brand);outline-offset:2px}
+.appearance-option [data-swatch]:before {background:var(--sample);border:1px solid var(--rule);border-radius:50%;width:.8em;height:.8em}
+.appearance-option [data-swatch=matchday]:before {content:'';--sample:#ffca3a}
+.appearance-option [data-swatch=forest]:before {content:'';--sample:#4a956c}
+.appearance-option [data-swatch=midnight]:before {content:'';--sample:#3978b4}
+.appearance-option [data-swatch=burgundy]:before {content:'';--sample:#ab4869}
+.appearance-option [data-swatch=charcoal]:before {content:'';--sample:linear-gradient(120deg,#352f28 55%,#edc260 55%)}

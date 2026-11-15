@@ -1,0 +1,12 @@
+.in-ref #content > :not(#refWorkspace){display:none!important}
+#refWorkspace{padding-block:clamp(20px,4vw,48px);min-height:55vh}
+#refWorkspace h1{margin:0;font:inherit;font-family:inherit;font-weight:850;font-size:clamp(32px,5vw,62px)}
+#refWorkspace iframe{display:block;width:100%;border:0;height:650px}
+#refWorkspace[hidden],#refLocked[hidden],#refLogout[hidden]{display:none}
+#refAccess,#refLogout{font:inherit;font-weight:750;background:none;color:inherit;border:0;cursor:pointer;text-decoration:none}
+#refLogout{text-decoration:underline}
+.ref-edit{display:none}.ref-active .ref-edit{display:inline-flex;margin:10px 0}
+#refLogin{max-width:min(92vw,430px);width:100%;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:16px;padding:clamp(18px,4vw,32px)}
+#refLogin::backdrop{background:rgb(0 0 0 / .65)}
+#refLogin h2{margin:0 0 16px}#refLogin label{display:grid;gap:6px;font-weight:650}#refLogin input{font:inherit;padding:12px;background:var(--bg);color:var(--ink);border:1px solid var(--rule);border-radius:6px;width:100%}
+#refLogin form>div{display:flex;gap:10px;align-items:center}#refLogin [data-cancel]{color:var(--ink);background:transparent;border:0;padding:10px;cursor:pointer}

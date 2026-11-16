@@ -20,3 +20,12 @@ body.embedded{color:var(--ink,#18212b);background:var(--bg,#f4f6f8)}
 .embedded :is(.hint,small,.toolbar span){color:var(--muted,#465565)}
 .embedded :is(nav .on,#publish,#matchClock,#feedback:not(:empty)){background:var(--accent-fill,#ffcf3f);color:var(--accent-ink,#171b22)}
 .embedded :is(.toolbar,.rosterList li){border-color:var(--rule,#a7b0bd)}.embedded :focus-visible{outline:3px solid var(--ink,#18212b);outline-offset:2px}
+
+:host{display:block;min-width:0;color:var(--ink);font:16px/1.45 system-ui,sans-serif}
+.inlineDesk main{width:100%;padding:0}.inlineDesk .layout{display:block;margin:1rem 0}.inlineDesk #tabs{display:none}
+.teamCrest,.crestInitial{width:26px;height:26px;object-fit:contain;flex:none}
+.crestInitial{display:inline-grid;place-items:center;background:#455568;color:white;border-radius:50%;font-size:14px}
+.teamLabel,.fixtureTeams,.clubSelect{display:inline-flex;align-items:center;gap:.45rem}
+.fixtureTeams{display:flex;flex-wrap:wrap;font-weight:700;margin-top:.85rem}
+.clubSelect{display:flex;min-width:0}.clubSelect select{min-width:0;flex:1}
+.inlineDesk .card{animation:none}.inlineDesk .layout,.inlineDesk .toolbar{min-width:0}.inlineDesk .toolbar{flex-wrap:wrap}.inlineDesk h4{margin:.6rem 0}.inlineDesk select{max-width:100%}

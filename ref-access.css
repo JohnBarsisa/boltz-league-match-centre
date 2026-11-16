@@ -1,7 +1,7 @@
 .in-ref #content > :not(#refWorkspace){display:none!important}
 #refWorkspace{padding-block:clamp(20px,4vw,48px);min-height:55vh}
 #refWorkspace h1{margin:0;font:inherit;font-family:inherit;font-weight:850;font-size:clamp(32px,5vw,62px)}
-#refWorkspace iframe{display:block;width:100%;border:0;height:650px}
+#refDeskPanel{width:100%;min-width:0;display:block}
 #refWorkspace[hidden],#refLocked[hidden],#refLogout[hidden]{display:none}
 #refAccess,#refLogout{font:inherit;font-weight:750;background:none;color:inherit;border:0;cursor:pointer;text-decoration:none}
 #refLogout{text-decoration:underline}
@@ -19,3 +19,7 @@
 .refNav a:hover,.refNav a:focus-visible{text-decoration:underline}
 .ref-active .fixtureEdit{padding:.5rem .8rem;border:1px solid var(--rule);border-radius:.4rem;margin:.55rem 0 0;align-items:center;min-height:42px}
 .fixtureEdit:is(:hover,:focus-visible){background:var(--accent-fill);color:var(--accent-ink)}
+
+@media(max-width:720px){.refNav nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible}.refNav a{padding:.4rem .15rem;white-space:normal;justify-content:center;text-align:center;line-height:1.15}#refLogin input{font-size:16px}.in-ref #refWorkspace{padding-top:12px}}
+
+.refNav a[aria-current=page]{box-shadow:inset 0 -3px var(--accent-fill);font-weight:800}

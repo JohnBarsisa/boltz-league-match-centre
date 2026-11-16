@@ -1,16 +1,18 @@
 'use strict';
-const $=id=>document.getElementById(id);
+export function mountRefDesk(root, query, inline = false) {
+ const lifetime = new AbortController();
+const $=id=>root.getElementById(id);
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const query = new URLSearchParams(location.search);
-const embedded = query.get('embedded') === '1' && window.parent !== window;
+
+const embedded = inline || query.get('embedded') === '1' && window.parent !== window;
 function deskFetch(path, options) {
- if (embedded && typeof window.parent.boltzRefFetch === 'function') return window.parent.boltzRefFetch(path, options);
+ if (embedded && typeof (inline ? window : window.parent).boltzRefFetch === 'function') return (inline ? window : window.parent).boltzRefFetch(path, options);
  return fetch(path, options);
 }
 function notifyParent(message) {
- if (embedded) window.parent.postMessage(message, location.origin);
+ if (embedded && !inline) window.parent.postMessage(message, location.origin);
 }
-if (embedded) {
+if (embedded && !inline) {
  document.body.classList.add('embedded');
  new ResizeObserver(() => notifyParent({type:'boltz-ref-height',height:Math.ceil(document.body.getBoundingClientRect().height)})).observe(document.body);
 }
@@ -21,17 +23,24 @@ let role='guest';
 const sectionTabs={teams:'Teams & squads',fixtures:'Fixtures',live:'Live matches',database:'Database control'};
 const tabs=[...Object.values(sectionTabs),'Homepage','Navigation'];
 let state,revision,dirty=false,busy=false,tab=sectionTabs[query.get('section')] || (query.has('match')?'Live matches':tabs[0]),club='Foxes',matchId,feature=0,eventSide,editEvent;
-window.boltzRefDirty=()=>dirty;
+if(!inline)window.boltzRefDirty=()=>dirty;
 const say=v=>$('feedback').textContent=v;
 const match=()=>state.matches.find(m=>m.id===matchId);
 const base='https://boltz-league-matchday.jpiyady.chatgpt.site';
 const field=(label,id,v,type='text')=>'<label>'+label+'<input id="'+id+'" type="'+type+'" value="'+escape(v)+'"></label>';
 const area=(label,id,v)=>'<label>'+label+'<textarea id="'+id+'">'+escape(v)+'</textarea></label>';
 const opts=(items,value)=>items.map(n=>'<option '+(n===value?'selected':'')+'>'+escape(n)+'</option>').join('');
-const select=(label,id,items,value)=>'<label>'+label+'<select id="'+id+'">'+opts(items,value)+'</select></label>';
+const select=(label,id,items,value)=>'<label>'+label+(['home','away','club','eventSide'].includes(id)?'<span class="clubSelect">'+crestBadge(value):'')+'<select id="'+id+'">'+opts(items,value)+'</select>'+(['home','away','club','eventSide'].includes(id)?'</span>':'')+'</label>';
 const chooseClub=n=>n.replace(/ FC$/,'');
 function changed(){dirty=true;notifyParent({type:'boltz-ref-dirty',dirty:true});$('revision').textContent='Unpublished changes';$('publish').disabled=busy}
 function render(){
+ if(inline){
+  const active=Object.keys(sectionTabs).find(key=>sectionTabs[key]===tab);
+  for(const link of document.querySelectorAll('.refNav a')){
+   if(link.hash.endsWith('='+active))link.setAttribute('aria-current','page');
+   else link.removeAttribute('aria-current');
+  }
+ }
  $('tabs').innerHTML=(role==='owner'?tabs:Object.values(sectionTabs)).map(t=>'<button data-tab="'+t+'" class="'+(tab===t?'on':'')+'">'+t+'</button>').join('');
  $('workspace').innerHTML='<h2>'+tab+'</h2>'+({'Live matches':matchView,Fixtures:fixtureView,'Teams & squads':clubView,'Database control':databaseView,Homepage:featureView,Navigation:menuView}[tab]());
  if($('assist')) $('assist').closest('label').hidden=$('type').value!=='goal';
@@ -96,7 +105,7 @@ function editRoster(oldName,newName) {
  }
  editingPlayer=null;changed();render();return true;
 }
-document.addEventListener('submit', async e=>{
+root.addEventListener('submit', async e=>{
  if(e.target.id==='addTeamForm'){
   e.preventDefault();
   if(busy)return;
@@ -123,12 +132,20 @@ document.addEventListener('submit', async e=>{
 function featureView(){const f=state.features[feature];return select('Homepage slide','feature',['Season 26','Foxes champions'],feature?'Foxes champions':'Season 26')+'<div class="card">'+field('Headline','title',f.title)+area('Description','description',f.description)+uploadControl(f.image)+'</div>'}
 function menuView(){return '<div class="card"><h3>Main navigation labels</h3>'+Object.entries(state.menu).map(([id,n])=>field(id.charAt(0).toUpperCase()+id.slice(1),'menu-'+id,n)).join('')+'</div>'}
 function players(side){return state.clubs[chooseClub(side)]?.players||[]}
+const crestNames=new Set(['Angels','Stacey','CityMen','Darkfang','Infinity','Typhoon','Foxes']);
+function crestBadge(name){
+ const key=name.replace(/ FC$/,'');
+ if(!crestNames.has(key))return '<span class="crestInitial" aria-hidden="true">'+escape(key.slice(0,1))+'</span>';
+ const url=new URL('../assets/'+encodeURIComponent(key)+'.png',import.meta.url);
+ return '<img class="teamCrest" alt="" src="'+escape(url.href)+'">';
+}
+function teamLabel(name){return '<span class="teamLabel">'+crestBadge(name)+escape(name)+'</span>'}
 function score(m){return [m.home,m.away].map(n=>m.events.filter(e=>(e.type==='goal'&&e.team===n)||(e.type==='own goal'&&e.team!==n)).length).join(' – ')}
 function fixtureActions() {
  return '<div class="row fixtureActions"><button id="newMatch">Add fixture</button><button class="danger" id="deleteFixture">Delete selected fixture</button></div>';
 }
 function fixturePicker(m,label='Fixture'){
- return '<label>'+label+'<select id="fixture">'+state.matches.map(x=>'<option value="'+escape(x.id)+'" '+(m===x?'selected':'')+'>'+escape(x.round+' · '+x.kickoff+' · '+x.home+' v '+x.away+' · '+x.status)+'</option>').join('')+'</select></label>';
+ return (label==='Fixture'?'<div class="fixtureTeams">'+teamLabel(m.home)+' <small>v</small> '+teamLabel(m.away)+'</div>':'')+'<label>'+label+'<select id="fixture">'+state.matches.map(x=>'<option value="'+escape(x.id)+'" '+(m===x?'selected':'')+'>'+escape(x.round+' · '+x.kickoff+' · '+x.home+' v '+x.away+' · '+x.status)+'</option>').join('')+'</select></label>';
 }
 function fixtureView(){
  const m=match();if(!m)return '<button id="newMatch">Add fixture</button>';
@@ -138,7 +155,7 @@ function fixtureView(){
 function matchView(){const m=match();if(!m)return '<button id="newMatch">Add fixture</button>';
  const sides=[m.home,m.away];if(!sides.includes(eventSide))eventSide=m.home;
  const e=m.events.find(x=>x.id===editEvent)||{team:eventSide,minute:'',player:'',assist:'',type:'goal'};
- return fixturePicker(m,'Match to edit')+'<section class="card"><div class="row"><h3>'+escape(m.home+' v '+m.away)+'</h3><span class="score">'+(m.status==='scheduled'?'—':score(m))+'</span></div><p>'+escape(m.round+' · '+m.kickoff+' · '+m.venue+' · '+m.status)+'</p>'+(m.status==='completed'?'':'<button id="matchClock">'+(m.status==='scheduled'?'Start match':'Finish match')+' &amp; publish</button>')+'</section><div class="card"><h3>Match timeline</h3><ol class="events">'+m.events.map(x=>'<li>'+escape([x.minute===''?'':x.minute+'′',eventIcons[x.type]+' '+x.type,x.team,x.player,x.assist?'assist '+x.assist:''].filter(Boolean).join(' · '))+' <button data-edit="'+escape(x.id)+'">Edit</button><button data-remove="'+escape(x.id)+'">Remove</button></li>').join('')+'</ol><div class="grid">'+'<label>Event<select id="type">'+Object.entries(eventIcons).map(([value,icon])=>'<option value="'+value+'" '+(value===e.type?'selected':'')+'>'+icon+' '+value+'</option>').join('')+'</select></label>'+select('Club','eventSide',sides,eventSide)+field('Minute (optional)','minute',e.minute,'number')+'<label>Player<input maxlength="70" id="player" list="rosterNames" value="'+escape(e.player)+'"></label><label>Assist (optional)<input id="assist" list="rosterNames" value="'+escape(e.assist)+'"></label></div><datalist id="rosterNames">'+opts(players(eventSide),'')+'</datalist><button id="addEvent">'+(editEvent?'Update event':'Add event')+'</button></div><div class="card" id="startingLineups"><h3>Starting lineups</h3><div class="grid">'+sides.map((n,i)=>'<div><h4>'+escape(n)+'</h4>'+select('Formation','shape-'+i,['Unannounced','2-3-1','3-2-1','2-2-1','2-1-1','4-3-3','4-4-2','3-5-2','4-2-3-1'],m.formations?.[n]||'Unannounced')+'<p class="hint">Drag a jersey or focus it and use the arrow keys to position a player.</p>'+shirtPitch(n,pitchPoints(m.lineups[n]||[],m.formations?.[n],m.positions?.[n]),escape,i)+'<label>Starter name<input id="starter-'+i+'" maxlength="70"></label><button type="button" data-starter="'+i+'">Add starter</button>'+[...new Set([...players(n),...(m.lineups[n]||[])])].map(v=>'<label class="check"><input type="checkbox" data-line="'+i+'" value="'+escape(v)+'" '+((m.lineups[n]||[]).includes(v)?'checked':'')+'>'+escape(v)+'</label>').join('')+(!players(n).length?'':'')+'</div>').join('')+'</div></div>'}
+ return fixturePicker(m,'Match to edit')+'<section class="card"><div class="row"><h3>'+teamLabel(m.home)+' v '+teamLabel(m.away)+'</h3><span class="score">'+(m.status==='scheduled'?'—':score(m))+'</span></div><p>'+escape(m.round+' · '+m.kickoff+' · '+m.venue+' · '+m.status)+'</p>'+(m.status==='completed'?'':'<button id="matchClock">'+(m.status==='scheduled'?'Start match':'Finish match')+' &amp; publish</button>')+'</section><div class="card"><h3>Match timeline</h3><ol class="events">'+m.events.map(x=>'<li>'+escape([x.minute===''?'':x.minute+'′',eventIcons[x.type]+' '+x.type,x.team,x.player,x.assist?'assist '+x.assist:''].filter(Boolean).join(' · '))+' <button data-edit="'+escape(x.id)+'">Edit</button><button data-remove="'+escape(x.id)+'">Remove</button></li>').join('')+'</ol><form id="eventForm"><div class="grid">'+'<label>Event<select id="type">'+Object.entries(eventIcons).map(([value,icon])=>'<option value="'+value+'" '+(value===e.type?'selected':'')+'>'+icon+' '+value+'</option>').join('')+'</select></label>'+select('Club','eventSide',sides,eventSide)+field('Minute (optional)','minute',e.minute,'number')+'<label>Player<input maxlength="70" id="player" list="rosterNames" value="'+escape(e.player)+'"></label><label>Assist (optional)<input id="assist" list="rosterNames" value="'+escape(e.assist)+'"></label></div><datalist id="rosterNames">'+opts(players(eventSide),'')+'</datalist><button id="addEvent">'+(editEvent?'Update event':dirty?'Add event to draft':'Add &amp; publish event')+'</button></form></div><div class="card" id="startingLineups"><h3>Starting lineups</h3><div class="grid">'+sides.map((n,i)=>'<div><h4>'+teamLabel(n)+'</h4>'+select('Formation','shape-'+i,['Unannounced','2-3-1','3-2-1','2-2-1','2-1-1','4-3-3','4-4-2','3-5-2','4-2-3-1'],m.formations?.[n]||'Unannounced')+'<p class="hint">Drag a jersey or focus it and use the arrow keys to position a player.</p>'+shirtPitch(n,pitchPoints(m.lineups[n]||[],m.formations?.[n],m.positions?.[n]),escape,i)+'<label>Starter name<input id="starter-'+i+'" maxlength="70"></label><button type="button" data-starter="'+i+'">Add starter</button>'+[...new Set([...players(n),...(m.lineups[n]||[])])].map(v=>'<label class="check"><input type="checkbox" data-line="'+i+'" value="'+escape(v)+'" '+((m.lineups[n]||[]).includes(v)?'checked':'')+'>'+escape(v)+'</label>').join('')+(!players(n).length?'':'')+'</div>').join('')+'</div></div>'}
 function capture(el){
  const k=el.id,v=el.value;
  if(tab==='Teams & squads'&&k==='squadName'){state.clubs[club].squadName=v.trim()||club+' FC'}
@@ -152,32 +169,32 @@ function capture(el){
  }else return;
  changed();
 }
-document.addEventListener('input',e=>{if(e.target.matches('input:not([type=file]):not([type=checkbox]),textarea'))capture(e.target)});
-document.addEventListener('change',async e=>{const el=e.target,v=el.value;
+root.addEventListener('input',e=>{if(e.target.matches('input:not([type=file]):not([type=checkbox]),textarea'))capture(e.target)});
+root.addEventListener('change',async e=>{const el=e.target,v=el.value;
  if(el.dataset.scene&&el.files[0]){
   const c=state.clubs[club],kind=el.dataset.scene,file=el.files[0];
-  busy=true;document.querySelector('.layout').inert=true;$('publish').disabled=true;
+  busy=true;root.querySelector('.layout').inert=true;$('publish').disabled=true;
   try{
    if(file.size>(kind==='clip'?16:3)*1024*1024)throw Error(kind==='clip'?'Choose an MP4 under 16 MB.':'Choose a still under 3 MB.');
    const r=await deskFetch(kind==='clip'?'api/clip':'api/upload',{method:'POST',body:file});
    const d=await r.json();if(!r.ok)throw Error(d.error);
    (c.scene??={})[kind]=d.path;changed();render();say('Media attached to draft.');
-  }catch(err){say(err.message)}finally{busy=false;document.querySelector('.layout').inert=false;$('publish').disabled=!dirty}
+  }catch(err){say(err.message)}finally{busy=false;root.querySelector('.layout').inert=false;$('publish').disabled=!dirty}
   return;
  }
  if(el.id.startsWith('shape-')){const m=match(),side=[m.home,m.away][Number(el.id.slice(-1))];m.formations??={};if(m.positions)delete m.positions[side];if(v==='Unannounced')delete m.formations[side];else m.formations[side]=v;changed();render();return}
  if(el.id==='upload'&&el.files[0]){
  const target=tab==='Homepage'?state.features[feature]:state.clubs[club];try{const file=el.files[0];if(file.size>3145728)throw Error('Choose a file under 3 MB.');const r=await deskFetch('api/upload',{method:'POST',body:file});const d=await r.json();if(!r.ok)throw Error(d.error);target.image=d.path;changed();render();say('Image uploaded. Publish changes to use it.')}catch(err){say(err.message)}return}
  if(el.id==='type'){$('assist').closest('label').hidden=v!=='goal';if(v!=='goal')$('assist').value='';return}
- if(el.id==='club'){club=v;editingPlayer=null;}else if(el.id==='feature')feature=v==='Season 26'?0:1;else if(el.id==='fixture'){matchId=v;editEvent=null;eventSide=null}else if(el.id==='eventSide'){eventSide=v;$('rosterNames').innerHTML=opts(players(v),'');return}
+ if(el.id==='club'){club=v;editingPlayer=null;}else if(el.id==='feature')feature=v==='Season 26'?0:1;else if(el.id==='fixture'){matchId=v;editEvent=null;eventSide=null}else if(el.id==='eventSide'){eventSide=v;const badge=el.previousElementSibling;if(badge)badge.outerHTML=crestBadge(v);$('rosterNames').innerHTML=opts(players(v),'');return}
  else if(el.dataset.line!==undefined){const m=match(),side=[m.home,m.away][+el.dataset.line],a=m.lineups[side]||[];if(el.checked&&a.length===11){el.checked=false;say('Select up to eleven starters.');return}if(!el.checked && m.positions?.[side])m.positions[side]=m.positions[side].filter(p=>p.name!==v);m.lineups[side]=el.checked?[...a,v]:a.filter(n=>n!==v);changed()}
  else if(el.tagName==='SELECT'){capture(el);if(!['status','home','away'].includes(el.id))return}else return;
  render();
 });
-document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||busy)return;
- if(b.id==='openMatch'){tab='Live matches';editEvent=null;render();return}
+root.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||busy)return;
+ if(b.id==='openMatch'){if(inline){location.hash='ref/'+encodeURIComponent(matchId)+'?section=live';return}tab='Live matches';editEvent=null;render();return}
  if(b.id==='openSquadLineup'){
-  matchId=$('squadFixture').value;eventSide=club+' FC';editEvent=null;tab='Live matches';render();
+  matchId=$('squadFixture').value;if(inline){history.replaceState(null,'','#ref/'+encodeURIComponent(matchId)+'?section=live');window.dispatchEvent(new Event('boltz-ref-lineup'))}eventSide=club+' FC';editEvent=null;tab='Live matches';render();
   $('startingLineups')?.scrollIntoView({block:'start'});return;
  }
  if(b.id==='matchClock'){
@@ -213,15 +230,15 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button');i
  if(b.id==='newMatch'){if(state.matches.length>=150){say('Season fixture limit reached.');return}const m={id:crypto.randomUUID(),round:'Round 1',kickoff:'13:00',venue:'Pitch 1',home:'Stacey FC',away:'Foxes FC',status:'scheduled',events:[],lineups:{},stream:''};state.matches.push(m);matchId=m.id;tab='Fixtures';changed();render();return}
  if(b.dataset.remove){match().events=match().events.filter(x=>x.id!==b.dataset.remove);editEvent=null;changed();render();return}
  if(b.dataset.edit){editEvent=b.dataset.edit;eventSide=match().events.find(x=>x.id===editEvent).team;render();$('player').focus();return}
- if(b.id==='addEvent'){const m=match();if(m.status==='scheduled'){say('Set the fixture to live before logging an event.');return}
+ if(b.id==='addEvent'){e.preventDefault();const saveNow=!dirty&&!editEvent;const m=match();if(m.status==='scheduled'){say('Set the fixture to live before logging an event.');return}
  const x={id:editEvent||crypto.randomUUID(),minute:$('minute').value===''?'':Number($('minute').value),type:$('type').value,team:eventSide,player:$('player').value.trim(),assist:$('assist').value.trim()};
  if(!x.player||x.minute!==''&&(!Number.isInteger(x.minute)||x.minute<0||x.minute>150)||x.assist&&(x.type!=='goal'||x.player===x.assist)){say('Check the player, minute and assist.');return}
- if(editEvent)m.events[m.events.findIndex(y=>y.id===editEvent)]=x;else m.events.push(x);editEvent=null;changed();render();say('Event recorded in draft. Publish to update the match centre.');return}
+ if(editEvent)m.events[m.events.findIndex(y=>y.id===editEvent)]=x;else m.events.push(x);editEvent=null;changed();render();if(saveNow)await publishDraft();else say('Event recorded in draft. Publish to update the match centre.');return}
  if(b.id==='publish'||b.id==='dbSave'){await publishDraft()}
 });
 async function publishDraft(){
  if(!dirty||busy)return;
- busy=true;$('publish').disabled=true;document.querySelector('.layout').inert=true;
+ busy=true;$('publish').disabled=true;root.querySelector('.layout').inert=true;
  try{
   const r=await deskFetch('api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,state})});
   const d=await r.json();if(!r.ok)throw Error(d.error||'Unable to save.');
@@ -230,19 +247,19 @@ async function publishDraft(){
   if(tab==='Database control')render();
   say('Saved to the match centre.');
  }catch(err){say(err.message)}
- finally{busy=false;$('publish').disabled=!dirty;document.querySelector('.layout').inert=false}
+ finally{busy=false;$('publish').disabled=!dirty;root.querySelector('.layout').inert=false}
 }
-addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}},{signal:lifetime.signal});
 function lockDesk(){
  $('revision').textContent='Locked';$('tabs').replaceChildren();$('publish').hidden=true;
  $('workspace').innerHTML='<form class="card loginCard" id="loginForm"><div class="eyebrow">MATCH OFFICIALS</div><h2>Referee sign-in</h2><label>Referee password<input id="refpass" type="password" autocomplete="current-password" required></label><button>Unlock match control</button></form>';
  $('loginForm').onsubmit=async e=>{e.preventDefault();try{const r=await deskFetch('api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('refpass').value})});const d=await r.json();$('refpass').value='';if(!r.ok)throw Error(d.error);await start()}catch(err){say(err.message)}};
 }
 async function start(){
- if(location.pathname.startsWith('/referee')){document.querySelector('header h1').textContent='Ref Area';document.title='Ref Area · Boltz League'}
+ if(location.pathname.startsWith('/referee')){root.querySelector('header h1').textContent='Ref Area';document.title='Ref Area · Boltz League'}
  let publication;
  if(embedded){
-   publication=await window.parent.boltzRefReady();
+   publication=await (inline ? window : window.parent).boltzRefReady();
    if(publication?.role!=='referee'||!publication.state)throw Error('Referee session unavailable. Open Ref Access to reconnect.');
    role=publication.role;
  }else{
@@ -260,7 +277,7 @@ async function start(){
  $('publish').hidden=false;$('signout').hidden=embedded||role!=='referee';$('revision').textContent=(role==='owner'?'Owner':'Referee')+' · revision '+revision;say('');render();
 }
 $('signout').onclick=async()=>{if(dirty&&!confirm('Discard unpublished changes and lock?'))return;const r=await deskFetch('api/logout',{method:'POST'});if(r.ok){dirty=false;location.reload()}};
-start().catch(e=>say(e.message));
+
 const shirtColours = {Stacey:'#8dc9ef', Angels:'#fafafa', CityMen:'#c42c35', Infinity:'#234eac', Foxes:'#e27419', Darkfang:'#292e35', Typhoon:'#257457'};
 function pitchPoints(names, formation, saved = []) {
   const counts = formation ? [1,...formation.split('-').map(Number)] : [1,2,3,2,3];
@@ -283,7 +300,7 @@ function shirtPitch(team, points, encode, editSide) {
     points.map(({name,x,y},i)=>'<'+tag+' class="jersey" '+(editable?'type="button" data-position="'+editSide+'" data-index="'+i+'" aria-label="Move '+encode(name)+'"':'')+' style="left:'+x+'%;top:'+y+'%">'+shirt+'<b>'+encode(name)+'</b></'+tag+'>').join('')+
     (points.length?'':'<span class="pitchEmpty">Lineup pending</span>')+'</div>';
 }
-document.addEventListener('click', e=>{
+root.addEventListener('click', e=>{
  const add=e.target.closest('[data-starter]');if(!add)return;
  const i=Number(add.dataset.starter), m=match(), side=[m.home,m.away][i];
  const value=$('starter-'+i).value.trim(), starters=m.lineups[side]||[];
@@ -299,17 +316,26 @@ function positionJersey(el,x,y) {
  el.style.left=point.x+'%';el.style.top=point.y+'%';changed();
 }
 let moving;
-document.addEventListener('pointerdown',e=>{
+root.addEventListener('pointerdown',e=>{
  const el=e.target.closest('button.jersey');if(!el||!e.isPrimary||e.button!==0)return;
  moving=el;el.setPointerCapture(e.pointerId);
 });
-document.addEventListener('pointermove',e=>{
+root.addEventListener('pointermove',e=>{
  if(!moving?.hasPointerCapture(e.pointerId))return;
  const r=moving.parentElement.getBoundingClientRect();
  positionJersey(moving,100*(e.clientX-r.left)/r.width,100*(e.clientY-r.top)/r.height);
 });
-for(const event of ['pointerup','pointercancel','lostpointercapture'])document.addEventListener(event,()=>moving=null);
-document.addEventListener('keydown',e=>{
+for(const event of ['pointerup','pointercancel','lostpointercapture'])root.addEventListener(event,()=>moving=null);
+root.addEventListener('keydown',e=>{
  const el=e.target.closest('button.jersey');if(!el||!['ArrowLeft','ArrowRight','ArrowDown','ArrowUp'].includes(e.key))return;
  e.preventDefault();positionJersey(el,parseFloat(el.style.left)+(e.key==='ArrowRight'?2:e.key==='ArrowLeft'?-2:0),parseFloat(el.style.top)+(e.key==='ArrowDown'?2:e.key==='ArrowUp'?-2:0));
 });
+
+ const ready=start().catch(e=>{say(e.message);throw e});
+ return {ready, dirty:()=>dirty, busy:()=>busy, destroy:()=>lifetime.abort(), navigate(section,id){
+  tab=sectionTabs[section] || (id?'Live matches':sectionTabs.teams);
+  if(id&&state.matches.some(m=>m.id===id))matchId=id;
+  editingPlayer=null;editEvent=null;eventSide=null;say('');render();
+ }};
+}
+if(document.getElementById('workspace'))mountRefDesk(document,new URLSearchParams(location.search)).ready.catch(()=>{});

@@ -5,49 +5,139 @@
       "kit": "Light blue & black",
       "bio": "Stacey have one league title and a reputation nobody relishes testing. They close gaps early, hold their shape and refuse to be drawn out. Even Angels know how quickly a promising attack can turn into another pass sideways. Against Stacey, getting near the box is one thing. Getting a clean shot away is another.",
       "image": "/boltz-league-match-centre/assets/club-Stacey.webp",
-      "players": []
+      "players": [
+        "AK",
+        "Bilal",
+        "Billan",
+        "Daniel (C)",
+        "Elliot",
+        "Harry B",
+        "Jeremiah",
+        "KP",
+        "Meyene",
+        "Rasheed",
+        "Saad",
+        "Warryn"
+      ]
     },
     "CityMen": {
       "title": "The Show Starts Here",
       "kit": "Crimson & white",
       "bio": "CityMen have the kind of lineup that makes you check the team sheet twice. There’s star quality everywhere, and nobody’s shy about showing it. A first touch can get as big a reaction as a goal. The question is what happens when all that individual talent clicks at once. That’s the CityMen performance everyone wants to see.",
       "image": "/boltz-league-match-centre/assets/club-CityMen.webp",
-      "players": []
+      "players": [
+        "Abz",
+        "Ben",
+        "Blessing",
+        "Derrick",
+        "Dickson",
+        "Ebenezer (C)",
+        "Georginho",
+        "Georginho (Pen)",
+        "Gerginho",
+        "Henry",
+        "James",
+        "John E",
+        "Mo",
+        "Omer",
+        "Prince"
+      ]
     },
     "Infinity": {
       "title": "Never a Quiet Game",
       "kit": "Deep blue & cyan",
       "bio": "Infinity are the league’s lovable little brothers, right up until they make a big brother look silly. Their games can get messy, and that’s often when they’re most dangerous. A loose ball, a run nobody tracked, a move that looked dead two seconds ago. Somehow, Infinity turn it into the moment everyone talks about afterwards.",
       "image": "/boltz-league-match-centre/assets/club-Infinity.webp",
-      "players": []
+      "players": [
+        "Abood (C)",
+        "Brandon",
+        "Ibrahim",
+        "Isreal",
+        "Lawrence",
+        "Mark",
+        "Onnie",
+        "Pete",
+        "Tommy",
+        "Tony"
+      ]
     },
     "Angels": {
       "title": "The Standard Everyone Chases",
       "kit": "White & silver",
       "bio": "The most decorated club in the league has made winning look routine. It isn’t. Angels bring elite talent and composed football, but the real test comes when you think you’ve got them beat. They can look out of a game for long stretches and still find the one opening that changes it. Every contender wants the title. They all want to beat Angels on the way there.",
       "image": "/boltz-league-match-centre/assets/club-Angels.webp",
-      "players": []
+      "players": [
+        "Abbas",
+        "Abiola",
+        "Adrian",
+        "Farouk S.",
+        "Fola",
+        "Malvin",
+        "Nheeyo",
+        "Reece",
+        "Rob. H",
+        "Teddy (C)",
+        "Yahya"
+      ]
     },
     "Foxes": {
       "title": "The Wild Card With Two Titles",
       "kit": "Orange & black",
       "bio": "Two titles tell you the Foxes are more than a surprise package. What makes them hard to prepare for is how often a new face changes the way they play. There’s always someone willing to try a run or a pass that wasn’t in the scouting report. By the time you’ve worked out what the Foxes are doing, they’re usually doing something else.",
       "image": "/boltz-league-match-centre/assets/club-Foxes.webp",
-      "players": []
+      "players": [
+        "Ace",
+        "Caleb",
+        "Caleeb",
+        "Connor",
+        "Drenzy",
+        "Keith",
+        "Khash",
+        "Marcus",
+        "Samuel",
+        "Seyi",
+        "Steve (C)",
+        "Toby",
+        "Zod"
+      ]
     },
     "Darkfang": {
       "title": "The Bite Is Coming Back",
       "kit": "Black & gold",
       "bio": "Darkfang are rediscovering what made them such a difficult team to play. They stay compact, choose their moments and don’t chase a game just because the opposition wants them to. Give them a loose pass, though, and that patience can turn into a counter before you’ve had time to get back. The bite is coming back.",
       "image": "/boltz-league-match-centre/assets/club-Darkfang.webp",
-      "players": []
+      "players": [
+        "Brandon",
+        "Glo (C)",
+        "Habib",
+        "Naji",
+        "Ola",
+        "Panashe",
+        "Saied",
+        "Tanzeem",
+        "Tawheed",
+        "Teejay",
+        "Uwa"
+      ]
     },
     "Typhoon": {
       "title": "No Time to Breathe",
       "kit": "Green",
       "bio": "Typhoon play like the next five seconds matter more than the last ninety. Young, quick and relentless, they press one pass and are already moving to close down the next. Their energy can make a match unpredictable, including for them. But once they find their rhythm, even a simple pass back starts to feel risky.",
       "image": "/boltz-league-match-centre/assets/club-Typhoon.webp",
-      "players": []
+      "players": [
+        "Ahmed",
+        "Alfie",
+        "Dylan",
+        "Enock",
+        "Eric",
+        "Freddie",
+        "Jamie",
+        "Marko (C)",
+        "Pablo",
+        "Timo",
+        "Timothy"
+      ]
     }
   },
   "matches": [

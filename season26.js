@@ -24,7 +24,7 @@ function currentClubs(){
 function seasonHub(inside){
   const live=data.upcoming.map((m,i)=>[m,i]).filter(([m])=>m.status==='live');
   const sections=[['matches','Matches',data.upcoming.length+' fixtures · '+new Set(data.upcoming.map(m=>m.round)).size+' rounds'],['table','League table',(leagueState?.tournament?.clubs.length||currentClubNames().length)+' clubs'],['stats','Player stats','Goals and assists'],['clubs','The contenders','Clubs and their fixtures']];
-  return '<section class="section">'+(inside?'<p class="desc">'+esc(leagueState?.tournament?.date||'Saturday 21 November 2026 · First kick-off 13:00')+'</p>':section('BOLTZ LEAGUE',esc(leagueState?.tournament?.name||'SEASON 6')))+'<div class="hubgrid">'+sections.map(([id,title,sub])=>'<a class="hubitem" href="#'+id+'"><h3>'+title+' ↗</h3><small>'+sub+'</small></a>').join('')+'</div></section>'+(inside?liveBroadcast():'');
+  return '<section class="section">'+(inside?'<p class="desc">'+esc(leagueState?.tournament?.date||'Saturday 21 November 2026 · First kick-off 13:00')+'</p>':section('BOLTZ LEAGUE',esc(leagueState?.tournament?.name||'SEASON 26')))+'<div class="hubgrid">'+sections.map(([id,title,sub])=>'<a class="hubitem" href="#'+id+'"><h3>'+title+' ↗</h3><small>'+sub+'</small></a>').join('')+'</div></section>'+(inside?liveBroadcast():'');
 }
 const slides=[
   {label:'SATURDAY 21 NOVEMBER 2026',title:'SEASON <em>26.</em>',description:'Seven clubs. One champion.',action:'Experience Season 26',route:'season'},
@@ -43,7 +43,7 @@ function renderSlide(){
  art.alt=feature===0?'Illustrated Season 26 players in the seven participating clubs’ colours':'Footballers under floodlights from the Season 25 champions campaign';
  document.getElementById('slideLabel').innerHTML='<span class="line"></span>'+(feature===0&&leagueState?.tournament?esc(leagueState.tournament.date):s.label);
  const campaign=leagueState?.features[feature];
- const heading=document.getElementById('slideTitle');if(feature===0 && (!campaign || /^season (26|6)\.?$/i.test(campaign.title))){heading.innerHTML='<span>BOLTZ LEAGUE</span><em>SEASON 6</em>'}else if(campaign){const words=campaign.title.toUpperCase().split(' '),em=document.createElement('em');em.textContent=words.pop();heading.replaceChildren(words.join(' ')+' ',em)}else heading.innerHTML=s.title;
+ const heading=document.getElementById('slideTitle');if(feature===0 && (!campaign || /^season (26|6)\.?$/i.test(campaign.title))){heading.innerHTML='<span>BOLTZ LEAGUE</span><em>SEASON 26</em>'}else if(campaign){const words=campaign.title.toUpperCase().split(' '),em=document.createElement('em');em.textContent=words.pop();heading.replaceChildren(words.join(' ')+' ',em)}else heading.innerHTML=s.title;
  document.querySelector('#slideDesc p').textContent=campaign?.description||s.description;
  const a=document.getElementById('heroLink');a.href='#'+s.route;a.textContent=(feature===0?'Explore the season':s.action)+' ↗';
  document.querySelectorAll('#dots button').forEach((b,i)=>b.setAttribute('aria-current',String(i===feature)));

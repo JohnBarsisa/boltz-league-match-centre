@@ -19,6 +19,7 @@ if (embedded && !inline) {
 const collator = new Intl.Collator('en', {sensitivity:'base', numeric:true});
 const eventIcons={'goal':'⚽','own goal':'↩','clean sheet':'🛡','yellow card':'🟨','red card':'🟥'};
 let editingPlayer=null, editingClub=null, livePanel='logging';
+const pendingEventPlayers=new Set();
 let role='guest';
 const sectionTabs={teams:'Teams & squads',fixtures:'Fixtures',live:'Live matches',database:'Database control'};
 const tabs=[...Object.values(sectionTabs),'Homepage','Navigation'];
@@ -42,13 +43,14 @@ function render(){
   }
  }
  $('tabs').innerHTML=(role==='owner'?tabs:Object.values(sectionTabs)).map(t=>'<button data-tab="'+t+'" class="'+(tab===t?'on':'')+'">'+t+'</button>').join('');
+ pendingEventPlayers.clear();
  $('workspace').innerHTML='<h2>'+tab+'</h2>'+({'Live matches':matchView,Fixtures:fixtureView,'Teams & squads':clubView,'Database control':databaseView,Homepage:featureView,Navigation:menuView}[tab]());
- if($('assist')) $('assist').closest('label').hidden=$('type').value!=='goal';
+ if($('eventForm'))updateEventFields();
 }
 function uploadControl(path){return '<img class="art" src="'+escape(path.startsWith('/media/')?path:base+path)+'" alt="Current artwork"><label>Replace artwork<input id="upload" type="file" accept="image/jpeg,image/png,image/webp"></label><p class="hint">JPEG, PNG or WebP, up to 3 MB. Publish to display it in the match centre.</p>'}
 function sceneEditor(c){
  const media=c.scene||{};
- return '<section class="card"><h3>Season 6 player film</h3><p>'+escape(sceneBriefs[club]||'Upload a selected player in the team kit.')+'</p><p>Frame one selected club player in their own kit, with boots and one football visible. Upload a short muted MP4 and a still of the same player.</p>'+
+ return '<section class="card"><h3>Season 26 player film</h3><p>'+escape(sceneBriefs[club]||'Upload a selected player in the team kit.')+'</p><p>Frame one selected club player in their own kit, with boots and one football visible. Upload a short muted MP4 and a still of the same player.</p>'+
  field('Selected player','scenePlayer',media.player||'')+
  '<label>Player still<input type="file" data-scene="poster" accept="image/jpeg,image/png,image/webp"></label>'+
  '<label>Player clip<input type="file" data-scene="clip" accept="video/mp4"></label>'+
@@ -84,7 +86,7 @@ function setSquadName(oldName, newName) {
 }
 function databaseView() {
  const playerCount=Object.values(state.clubs).reduce((sum,c)=>sum+c.players.length,0);
- return '<section class="card"><h3>Season 6 records</h3><p>'+state.matches.length+' fixtures · '+playerCount+' registered players · revision '+revision+'</p>'+
+ return '<section class="card"><h3>Season 26 records</h3><p>'+state.matches.length+' fixtures · '+playerCount+' registered players · revision '+revision+'</p>'+
    '<div class="row"><button id="dbSave">Save changes</button><button id="reloadRecords">Reload published records</button></div></section>'+
    '<section class="card"><h3>Reset season data</h3><p>Clear this season’s squads, fixtures, scores, lineups and events. Club profiles and league archives stay available.</p>'+
    '<button id="resetSeason" class="danger">Reset season data</button></section>';
@@ -176,10 +178,80 @@ function matchList(section) {
 function matchPanels(){
  return '<div class="matchPanels" role="group" aria-label="Match controls">'+[['logging','Ref logging'],['timeline','Timeline'],['lineups','Lineups']].map(([key,label])=>'<button data-panel="'+key+'" aria-pressed="'+(livePanel===key)+'">'+label+'</button>').join('')+'</div>';
 }
+
+function eventPlayerPicker(id,label,selected,optional=false){
+ const roster=[...players(eventSide)].sort(collator.compare);
+ const options=(selected&&!roster.includes(selected)?[selected,...roster]:roster)
+   .map(name=>'<option value="'+escape(name)+'"'+(name===selected?' selected':'')+'>'+escape(name)+(roster.includes(name)?'':' (recorded name)')+'</option>').join('');
+ return '<div class="eventPlayerPicker" id="'+id+'Picker"><label>'+label+
+   '<select id="'+id+'"'+(optional?'':' required')+'><option value="">'+(optional?'No assist':'Choose a registered player')+'</option>'+options+'</select></label>'+
+   '<button type="button" data-new-event-player="'+id+'">'+(optional?'Add missing assister':'Add missing player')+'</button></div>';
+}
+function eventForm(e){
+ return '<form id="eventForm"><div class="grid"><label>Event<select id="type">'+
+   Object.entries(eventIcons).map(([value,icon])=>'<option value="'+value+'"'+(value===e.type?' selected':'')+'>'+icon+' '+value+'</option>').join('')+
+   '</select></label>'+field('Minute (optional)','minute',e.minute,'number')+
+   eventPlayerPicker('player','Player',e.player)+eventPlayerPicker('assist','Assist (optional)',e.assist,true)+'</div>'+
+   '<p class="hint" id="eventScoringHint"></p>'+
+   '<div id="newEventPlayer" class="newEventPlayer" hidden><label>New player name<input id="newEventPlayerName" maxlength="70" autocomplete="off" enterkeyhint="done"></label>'+
+   '<div class="row"><button type="button" id="addNameToEvent">Add and select</button><button type="button" id="cancelEventPlayer">Cancel</button></div>'+
+   '<p class="hint">The player joins this team’s squad when the event is published.</p></div>'+
+   '<div role="status" id="eventFeedback" class="eventFeedback"></div>'+
+   '<button type="submit" id="addEvent">'+(editEvent?'Update event':dirty?'Add event to draft':'Add &amp; publish event')+'</button></form>';
+}
+function editEventMessage(message){$('eventFeedback').textContent=message}
+function updateEventFields(){
+ const goal=$('type').value==='goal',ownGoal=$('type').value==='own goal';
+ const assist=$('assist');
+ $('assistPicker').hidden=!goal;assist.disabled=!goal;
+ if(!goal){
+  assist.value='';
+  if($('newEventPlayer').dataset.pick==='assist'&&!$('newEventPlayer').hidden)closeEventPlayer(false);
+ }
+ const team=state.clubs[chooseClub(eventSide)]?.squadName||eventSide;
+ const opponent=[match().home,match().away].find(side=>side!==eventSide);
+ const credited=state.clubs[chooseClub(opponent)]?.squadName||opponent;
+ $('eventScoringHint').textContent=ownGoal?'Pick the player from '+team+'. The goal counts for '+credited+'.':'Players listed for '+team+'.';
+}
+function openEventPlayer(pick){
+ const editor=$('newEventPlayer');
+ editor.dataset.pick=pick;
+ editor.hidden=false;
+ $('newEventPlayerName').value='';
+ editEventMessage('');
+ $('newEventPlayerName').focus();
+}
+function closeEventPlayer(refocus=true){
+ const editor=$('newEventPlayer'),pick=editor.dataset.pick;
+ editor.hidden=true;
+ $('newEventPlayerName').value='';
+ if(refocus)root.querySelector('[data-new-event-player="'+pick+'"]')?.focus();
+}
+function addEventPlayer(){
+ const name=$('newEventPlayerName').value.normalize('NFKC').trim().replace(/\s+/g,' ');
+ if(!name||name.length>70){editEventMessage('Enter a player name of up to 70 characters.');return}
+ const registered=players(eventSide);
+ const known=[...registered,...pendingEventPlayers].find(p=>collator.compare(p,name)===0);
+ const selected=known||name;
+ if(!known){
+  if(registered.length>=80){editEventMessage('This squad is full. It can contain up to 80 players.');return}
+  pendingEventPlayers.add(selected);
+ }
+ const pick=$('newEventPlayer').dataset.pick;
+ for(const id of ['player','assist']){
+  if(![...$(id).options].some(option=>option.value===selected))$(id).add(new Option(selected,selected));
+ }
+ $(pick).value=selected;
+ closeEventPlayer(false);
+ $(pick).focus();
+ editEventMessage(registered.includes(selected)?selected+' selected from the squad.':selected+' selected. Publish the event to save the player to the squad.');
+}
+
 function matchView(){const m=match();if(!m)return '<button id="newMatch">Add fixture</button>';
  const sides=[m.home,m.away];if(!sides.includes(eventSide))eventSide=m.home;
- const e=m.events.find(x=>x.id===editEvent)||{team:eventSide,minute:'',player:'',assist:'',type:'goal'};
- return matchList('live')+'<section class="card matchControl" id="matchControl" tabindex="-1"><div class="matchHeading">'+versus(m.home,m.away)+'<span class="score">'+(m.status==='scheduled'?'—':score(m))+'</span></div><p class="matchMeta"><span class="fixtureStatus" data-status="'+escape(m.status)+'">'+escape(m.status)+'</span> '+escape(m.round+' · '+m.kickoff+' · '+m.venue)+'</p>'+(m.status==='completed'?'':'<button id="matchClock">'+(m.status==='scheduled'?'Start match':'Finish match')+' &amp; publish</button>')+'</section>'+matchPanels()+'<div class="card" '+(livePanel==='timeline'?'':'hidden')+'><h3>Match timeline</h3><ol class="events">'+m.events.map(x=>'<li>'+escape([x.minute===''?'':x.minute+'′',eventIcons[x.type]+' '+x.type,x.team,x.player,x.assist?'assist '+x.assist:''].filter(Boolean).join(' · '))+' <button data-edit="'+escape(x.id)+'">Edit</button><button data-remove="'+escape(x.id)+'">Remove</button></li>').join('')+(m.events.length?'':'<li>No events recorded yet.</li>')+'</ol></div><div class="card" '+(livePanel==='logging'?'':'hidden')+'><h3>Ref logging</h3><div class="eventTeamButtons">'+sides.map(side=>'<button data-event-team="'+escape(side)+'" aria-pressed="'+(side===eventSide)+'">'+teamLabel(side)+'</button>').join('')+'</div><form id="eventForm"><div class="grid">'+'<label>Event<select id="type">'+Object.entries(eventIcons).map(([value,icon])=>'<option value="'+value+'" '+(value===e.type?'selected':'')+'>'+icon+' '+value+'</option>').join('')+'</select></label>'+field('Minute (optional)','minute',e.minute,'number')+'<label>Player<input maxlength="70" id="player" list="rosterNames" value="'+escape(e.player)+'"></label><label>Assist (optional)<input id="assist" list="rosterNames" value="'+escape(e.assist)+'"></label></div><datalist id="rosterNames">'+opts(players(eventSide),'')+'</datalist><button id="addEvent">'+(editEvent?'Update event':dirty?'Add event to draft':'Add &amp; publish event')+'</button></form></div><div class="card" id="startingLineups" tabindex="-1" '+(livePanel==='lineups'?'':'hidden')+'><h3>Starting lineups</h3><div class="grid">'+sides.map((n,i)=>'<div><h4>'+teamLabel(n)+'</h4>'+select('Formation','shape-'+i,['Unannounced','2-3-1','3-2-1','2-2-1','2-1-1','4-3-3','4-4-2','3-5-2','4-2-3-1'],m.formations?.[n]||'Unannounced')+'<p class="hint">Drag a jersey or focus it and use the arrow keys to position a player.</p>'+shirtPitch(n,pitchPoints(m.lineups[n]||[],m.formations?.[n],m.positions?.[n]),escape,i)+'<label>Starter name<input id="starter-'+i+'" maxlength="70"></label><button type="button" data-starter="'+i+'">Add starter</button>'+[...new Set([...players(n),...(m.lineups[n]||[])])].map(v=>'<label class="check"><input type="checkbox" data-line="'+i+'" value="'+escape(v)+'" '+((m.lineups[n]||[]).includes(v)?'checked':'')+'>'+escape(v)+'</label>').join('')+(!players(n).length?'':'')+'</div>').join('')+'</div></div>'}
+ const recorded=m.events.find(x=>x.id===editEvent);
+ const e={...recorded,player:recorded?.team===eventSide?recorded.player:'',assist:recorded?.team===eventSide?recorded.assist:'',minute:recorded?.minute??'',type:recorded?.type||'goal'};
+ return matchList('live')+'<section class="card matchControl" id="matchControl" tabindex="-1"><div class="matchHeading">'+versus(m.home,m.away)+'<span class="score">'+(m.status==='scheduled'?'—':score(m))+'</span></div><p class="matchMeta"><span class="fixtureStatus" data-status="'+escape(m.status)+'">'+escape(m.status)+'</span> '+escape(m.round+' · '+m.kickoff+' · '+m.venue)+'</p>'+(m.status==='completed'?'':'<button id="matchClock">'+(m.status==='scheduled'?'Start match':'Finish match')+' &amp; publish</button>')+'</section>'+matchPanels()+'<div class="card" '+(livePanel==='timeline'?'':'hidden')+'><h3>Match timeline</h3><ol class="events">'+m.events.map(x=>'<li>'+escape([x.minute===''?'':x.minute+'′',eventIcons[x.type]+' '+x.type,x.team,x.player,x.assist?'assist '+x.assist:''].filter(Boolean).join(' · '))+' <button data-edit="'+escape(x.id)+'">Edit</button><button data-remove="'+escape(x.id)+'">Remove</button></li>').join('')+(m.events.length?'':'<li>No events recorded yet.</li>')+'</ol></div><div class="card" '+(livePanel==='logging'?'':'hidden')+'><h3>Ref logging</h3><div class="eventTeamButtons">'+sides.map(side=>'<button data-event-team="'+escape(side)+'" aria-pressed="'+(side===eventSide)+'">'+teamLabel(side)+'</button>').join('')+'</div>'+eventForm(e)+'</div><div class="card" id="startingLineups" tabindex="-1" '+(livePanel==='lineups'?'':'hidden')+'><h3>Starting lineups</h3><div class="grid">'+sides.map((n,i)=>'<div><h4>'+teamLabel(n)+'</h4>'+select('Formation','shape-'+i,['Unannounced','2-3-1','3-2-1','2-2-1','2-1-1','4-3-3','4-4-2','3-5-2','4-2-3-1'],m.formations?.[n]||'Unannounced')+'<p class="hint">Drag a jersey or focus it and use the arrow keys to position a player.</p>'+shirtPitch(n,pitchPoints(m.lineups[n]||[],m.formations?.[n],m.positions?.[n]),escape,i)+'<label>Starter name<input id="starter-'+i+'" maxlength="70"></label><button type="button" data-starter="'+i+'">Add starter</button>'+[...new Set([...players(n),...(m.lineups[n]||[])])].map(v=>'<label class="check"><input type="checkbox" data-line="'+i+'" value="'+escape(v)+'" '+((m.lineups[n]||[]).includes(v)?'checked':'')+'>'+escape(v)+'</label>').join('')+(!players(n).length?'':'')+'</div>').join('')+'</div></div>'}
 function capture(el){
  const k=el.id,v=el.value;
  if(tab==='Teams & squads'&&k==='scenePlayer'){(state.clubs[club].scene??={}).player=v.trim()}
@@ -208,7 +280,7 @@ root.addEventListener('change',async e=>{const el=e.target,v=el.value;
  if(el.id.startsWith('shape-')){const m=match(),side=[m.home,m.away][Number(el.id.slice(-1))];m.formations??={};if(m.positions)delete m.positions[side];if(v==='Unannounced')delete m.formations[side];else m.formations[side]=v;changed();render();return}
  if(el.id==='upload'&&el.files[0]){
  const target=tab==='Homepage'?state.features[feature]:state.clubs[club];try{const file=el.files[0];if(file.size>3145728)throw Error('Choose a file under 3 MB.');const r=await deskFetch('api/upload',{method:'POST',body:file});const d=await r.json();if(!r.ok)throw Error(d.error);target.image=d.path;changed();render();say('Image uploaded. Publish changes to use it.')}catch(err){say(err.message)}return}
- if(el.id==='type'){$('assist').closest('label').hidden=v!=='goal';if(v!=='goal')$('assist').value='';return}
+ if(el.id==='type'){updateEventFields();editEventMessage('');return}
  if(el.id==='club'){club=v;editingPlayer=null;}else if(el.id==='feature')feature=v==='Season 26'?0:1;else if(el.id==='fixture'){matchId=v;editEvent=null;eventSide=null}
  else if(el.dataset.line!==undefined){const m=match(),side=[m.home,m.away][+el.dataset.line],a=m.lineups[side]||[];if(el.checked&&a.length===11){el.checked=false;say('Select up to eleven starters.');return}if(!el.checked && m.positions?.[side])m.positions[side]=m.positions[side].filter(p=>p.name!==v);m.lineups[side]=el.checked?[...a,v]:a.filter(n=>n!==v);changed()}
  else if(el.tagName==='SELECT'){capture(el);if(!['status','home','away'].includes(el.id))return}else return;
@@ -227,7 +299,15 @@ root.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b
  const card=b.closest('[data-club-card]');if(card)club=card.dataset.clubCard;
  if(b.dataset.match){matchId=b.dataset.match;editEvent=null;eventSide=null;syncMatchRoute(b.dataset.section);render();focusSection(b.dataset.section==='live'?'#matchControl':'.fixtureActions');return}
  if(b.dataset.panel){livePanel=b.dataset.panel;render();root.querySelector('[data-panel="'+livePanel+'"]')?.focus({preventScroll:true});return}
- if(b.dataset.eventTeam){const type=$('type').value, minute=$('minute').value;eventSide=b.dataset.eventTeam;editEvent=null;livePanel='logging';render();$('type').value=type;$('minute').value=minute;$('assist').closest('label').hidden=type!=='goal';$('player').focus({preventScroll:true});return}
+ if(b.dataset.eventTeam){
+  if(eventSide===b.dataset.eventTeam)return;
+  const type=$('type').value, minute=$('minute').value;
+  eventSide=b.dataset.eventTeam;livePanel='logging';render();
+  $('type').value=type;$('minute').value=minute;updateEventFields();$('player').focus({preventScroll:true});return;
+ }
+ if(b.dataset.newEventPlayer){openEventPlayer(b.dataset.newEventPlayer);return}
+ if(b.id==='addNameToEvent'){addEventPlayer();return}
+ if(b.id==='cancelEventPlayer'){closeEventPlayer();editEventMessage('');return}
 
  if(b.id==='openMatch'){livePanel='logging';if(inline){location.hash='ref/'+encodeURIComponent(matchId)+'?section=live';return}tab='Live matches';editEvent=null;render();return}
  if(b.hasAttribute('data-open-squad-lineup')){
@@ -244,7 +324,7 @@ root.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b
   try{await start();say('Loaded published records.')}catch(err){say(err.message)}return;
  }
  if(b.id==='resetSeason'){
-  if(prompt('Clear all Season 6 squads and matches? Type RESET SEASON to stage the reset.')!=='RESET SEASON')return;
+  if(prompt('Clear all Season 26 squads and matches? Type RESET SEASON to stage the reset.')!=='RESET SEASON')return;
   for(const c of Object.values(state.clubs))c.players=[];
   state.matches=[];matchId=null;editEvent=null;editingPlayer=null;changed();render();say('Reset staged. Save changes to publish, or reload to discard.');return;
  }
@@ -270,10 +350,30 @@ root.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b
  if(b.id==='publish'||b.id==='dbSave'){await publishDraft()}
 });
 async function saveEvent(){
- const saveNow=!dirty&&!editEvent;const m=match();if(m.status==='scheduled'){say('Set the fixture to live before logging an event.');return}
- const x={id:editEvent||crypto.randomUUID(),minute:$('minute').value===''?'':Number($('minute').value),type:$('type').value,team:eventSide,player:$('player').value.trim(),assist:$('assist').value.trim()};
- if(!x.player||x.minute!==''&&(!Number.isInteger(x.minute)||x.minute<0||x.minute>150)||x.assist&&(x.type!=='goal'||x.player===x.assist)){say('Check the player, minute and assist.');return}
- if(editEvent)m.events[m.events.findIndex(y=>y.id===editEvent)]=x;else m.events.push(x);editEvent=null;changed();render();if(saveNow)await publishDraft();else say('Event recorded in draft. Publish to update the match centre.');
+ const saveNow=!dirty&&!editEvent, m=match(), type=$('type').value;
+ if(m.status==='scheduled'){editEventMessage('Start the match before logging an event.');return}
+ if(!$('newEventPlayer').hidden){editEventMessage('Select the new player using Add and select, or cancel the entry.');return}
+ const player=$('player').value, assist=type==='goal'?$('assist').value:'';
+ const record=m.events.find(x=>x.id===editEvent&&x.team===eventSide);
+ const registered=players(eventSide);
+ const available=(name,field)=>registered.includes(name)||pendingEventPlayers.has(name)||record?.[field]===name;
+ const minute=$('minute').value===''?'':Number($('minute').value);
+ if(!player||!available(player,'player')||assist&&(!available(assist,'assist')||assist===player)){
+  editEventMessage('Choose a player from this team and, if needed, a different player for the assist.');return;
+ }
+ if(minute!==''&&(!Number.isInteger(minute)||minute<0||minute>150)){
+  editEventMessage('Enter a minute from 0 to 150, or leave it blank.');return;
+ }
+ if(!editEvent&&m.events.length>=300){editEventMessage('This match has reached the event limit.');return}
+ const additions=[...new Set([player,assist])].filter(n=>pendingEventPlayers.has(n)&&!registered.includes(n));
+ if(registered.length+additions.length>80){editEventMessage('This squad can contain up to 80 players.');return}
+ const x={id:editEvent||crypto.randomUUID(),minute,type,team:eventSide,player,assist};
+ const c=state.clubs[chooseClub(eventSide)];
+ if(additions.length)c.players=[...registered,...additions].sort(collator.compare);
+ if(editEvent)m.events[m.events.findIndex(y=>y.id===editEvent)]=x;else m.events.push(x);
+ editEvent=null;changed();render();
+ if(saveNow)await publishDraft();
+ else say(additions.length?'Event and new player saved to draft. Publish changes to make them live.':'Event recorded in draft. Publish to update the match centre.');
 }
 async function publishDraft(){
  if(!dirty||busy)return;
@@ -367,6 +467,9 @@ root.addEventListener('pointermove',e=>{
 });
 for(const event of ['pointerup','pointercancel','lostpointercapture'])root.addEventListener(event,()=>moving=null);
 root.addEventListener('keydown',e=>{
+ if(e.target.id==='newEventPlayerName'&&e.key==='Enter'&&!e.isComposing){
+  e.preventDefault();if(!busy)addEventPlayer();return;
+ }
  const el=e.target.closest('button.jersey');if(!el||!['ArrowLeft','ArrowRight','ArrowDown','ArrowUp'].includes(e.key))return;
  e.preventDefault();positionJersey(el,parseFloat(el.style.left)+(e.key==='ArrowRight'?2:e.key==='ArrowLeft'?-2:0),parseFloat(el.style.top)+(e.key==='ArrowDown'?2:e.key==='ArrowUp'?-2:0));
 });

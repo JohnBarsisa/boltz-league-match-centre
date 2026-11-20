@@ -43,8 +43,8 @@
   if(initialState){const state=initialState;initialState=null;return state}
   try{return await readDesk()}catch(error){if(error.expired){disconnect();ask();feedback.textContent=error.message}throw error}
  };
- const moduleURL=new URL('ref-desk/studio.js',document.baseURI);
- const cssURL=new URL('ref-desk/studio.css',document.baseURI);
+ const moduleURL=new URL('ref-desk/studio.js?v=26.1',document.baseURI);
+ const cssURL=new URL('ref-desk/studio.css?v=26.1',document.baseURI);
  let editorModule;
  function warmEditor(){return editorModule??=import(moduleURL.href).catch(error=>{editorModule=null;throw error})}
  password.enterKeyHint='go';
@@ -71,7 +71,7 @@
   const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href=cssURL.href;
   root.append(sheet);
   const body=document.createElement('div');body.className='embedded inlineDesk';
-  body.innerHTML="<main><div class=\"toolbar\"><strong>Season 6</strong><span id=\"revision\">Connecting\u2026</span><button id=\"publish\" disabled>Publish changes \u2197</button></div><div class=\"layout\"><nav aria-label=\"Studio sections\" id=\"tabs\"></nav><section><div id=\"feedback\" role=\"status\"></div><div id=\"workspace\">Loading season records\u2026</div></section></div></main><button id=\"signout\" hidden></button>";
+  body.innerHTML="<main><div class=\"toolbar\"><strong>Season 26</strong><span id=\"revision\">Connecting\u2026</span><button id=\"publish\" disabled>Publish changes \u2197</button></div><div class=\"layout\"><nav aria-label=\"Studio sections\" id=\"tabs\"></nav><section><div id=\"feedback\" role=\"status\"></div><div id=\"workspace\">Loading season records\u2026</div></section></div></main><button id=\"signout\" hidden></button>";
   root.append(body);
   warmEditor().then(({mountRefDesk})=>{
    if(panel!==host)return;

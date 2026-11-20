@@ -1,6 +1,9 @@
 let leagueState,leagueRevision=-1,pendingLeague=false;
 function applyLeague(s){
- leagueState=s;data.upcoming=s.matches.map(m=>{
+ const tournament=s.tournament;
+ leagueState=tournament && /^season\s+6\.?$/i.test(tournament.name.trim())
+   ? {...s,tournament:{...tournament,name:'Season 26'}} : s;
+ data.upcoming=s.matches.map(m=>{
   const scores=[m.home,m.away].map(n=>m.events.filter(e=>(e.type==='goal'&&e.team===n)||(e.type==='own goal'&&e.team!==n)).length);
   return {...m,home_score:scores[0],away_score:scores[1]};
  });
@@ -40,15 +43,15 @@ function clubProfile(name){
  const c=leagueState?.clubs[name];if(!c)return '';
  const defaults=seasonDefaults.clubs[name], prior=priorClubCopy[name];
  const title=defaults && prior && c.title===prior[0]?defaults.title:c.title;
- const bio=defaults && prior && c.bio===prior[1]?defaults.bio:c.bio;
+ const bio=defaults && prior && c.bio===prior[1]?defaults.bio:c.bio==='Season 6 squad.'?'Season 26 squad.':c.bio;
  const scene=c.scene||{};
  const selected=Boolean(scene.player && scene.poster);
  const poster=selected?scene.poster:'/boltz-league-match-centre/storyboard/'+name+'.webp';
  const clip=selected?scene.clip:null;
- const label=selected?scene.player+' · '+name+' FC':'Season 6 campaign artwork';
+ const label=selected?scene.player+' · '+name+' FC':'Season 26 campaign artwork';
  const frame=!selected&&!defaults?'':'<figure class="profileFilm"><div class="filmFrame"><img class="filmStill" src="'+esc(poster)+'" alt="'+esc(selected?scene.player+' in the '+name+' FC kit':name+' FC scene preview')+'">'+
  (clip?'<video hidden muted playsinline loop preload="none" poster="'+esc(poster)+'" data-src="'+esc(clip)+'" aria-label="'+esc(label)+'"></video>':'')+'</div><figcaption>'+esc(label)+'</figcaption></figure>';
- return '<article class="clubprofile"><header class="profileHeading"><div class="kicker">SEASON 6 · CLUB PROFILE</div><h2>'+esc(name)+' FC</h2><h3 class="clubmotto">'+esc(title)+'</h3></header>'+frame+'<section class="profileStory"><p>'+esc(bio)+'</p><h3>'+esc(c.squadName || 'Squad')+'</h3>'+(c.players.length?'<ul class="roster">'+c.players.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>':'<p class="note">The club’s squad has yet to be announced.</p>')+'</section></article>';
+ return '<article class="clubprofile"><header class="profileHeading"><div class="kicker">SEASON 26 · CLUB PROFILE</div><h2>'+esc(name)+' FC</h2><h3 class="clubmotto">'+esc(title)+'</h3></header>'+frame+'<section class="profileStory"><p>'+esc(bio)+'</p><h3>'+esc(c.squadName || 'Squad')+'</h3>'+(c.players.length?'<ul class="roster">'+c.players.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>':'<p class="note">The club’s squad has yet to be announced.</p>')+'</section></article>';
 }
 function lineupView(m,source){
  return '<div class="formationGrid">'+[m.home,m.away].map(side=>{
